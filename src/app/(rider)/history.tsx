@@ -10,7 +10,6 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
-
 type Order = {
   id: string
   order_number: string
@@ -18,19 +17,15 @@ type Order = {
   delivery_address: string
   delivered_at: string | null
 }
-
 export default function RiderHistoryScreen() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
     fetchHistory()
   }, [])
-
   const fetchHistory = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const { data } = await supabase
       .from('orders')
       .select('id, order_number, total_price, delivery_address, delivered_at')
@@ -38,11 +33,9 @@ export default function RiderHistoryScreen() {
       .eq('status', 'delivered')
       .order('delivered_at', { ascending: false })
       .limit(50)
-
     setOrders((data as Order[]) ?? [])
     setLoading(false)
   }
-
   const formatDate = (d: string | null) =>
     d
       ? new Date(d).toLocaleDateString('th-TH', {
@@ -50,7 +43,6 @@ export default function RiderHistoryScreen() {
           hour: '2-digit', minute: '2-digit',
         })
       : '-'
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -60,13 +52,11 @@ export default function RiderHistoryScreen() {
         <Text style={styles.headerTitle}>ประวัติงานที่ส่งแล้ว</Text>
         <View style={{ width: 40 }} />
       </View>
-
       {loading ? (
         <ActivityIndicator size="large" color="#1C8A99" style={{ marginTop: 40 }} />
       ) : (
         <ScrollView style={styles.content}>
           <Text style={styles.sectionLabel}>ทั้งหมด {orders.length} งาน</Text>
-
           {orders.length === 0 ? (
             <Text style={styles.emptyText}>ยังไม่มีงานที่ส่งเสร็จ</Text>
           ) : (
@@ -81,14 +71,12 @@ export default function RiderHistoryScreen() {
               </View>
             ))
           )}
-
           <View style={{ height: 24 }} />
         </ScrollView>
       )}
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F5F7' },
   header: {
@@ -101,7 +89,6 @@ const styles = StyleSheet.create({
   content: { flex: 1, padding: 16 },
   sectionLabel: { fontSize: 13, color: '#888780', marginBottom: 10 },
   emptyText: { fontSize: 13, color: '#B4B2A9', fontStyle: 'italic' },
-
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10 },
   cardHeader: {
     flexDirection: 'row', justifyContent: 'space-between',

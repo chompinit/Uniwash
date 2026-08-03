@@ -14,15 +14,12 @@ import {
 } from 'react-native'
 import { Brand } from '../../constants/theme'
 import { supabase } from '../../../lib/supabase'
-
 export default function LoginScreen() {
-  const [email, setEmail]               = useState('')
-  const [password, setPassword]         = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [remember, setRemember]         = useState(false)
-  const [loading, setLoading]           = useState(false)
-
-  // เข้าสู่ระบบ — root layout (_layout.tsx) จะ route ตาม role ให้อัตโนมัติ
+  const [remember, setRemember] = useState(false)
+  const [loading, setLoading] = useState(false)
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('แจ้งเตือน', 'กรุณากรอกอีเมลและรหัสผ่าน')
@@ -37,9 +34,7 @@ export default function LoginScreen() {
     if (error) {
       Alert.alert('ไม่สำเร็จ', error.message)
     }
-    // สำเร็จ → onAuthStateChange ใน _layout จะพาไปหน้าตาม role
   }
-
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -47,13 +42,11 @@ export default function LoginScreen() {
         style={{ flex: 1 }}
       >
         <View style={styles.content}>
-
-          {/* Title */}
+          {}
           <Text style={styles.appName}>Uniwash</Text>
           <Text style={styles.welcome}>ยินดีต้อนรับ</Text>
           <Text style={styles.desc}>กรุณาเข้าสู่ระบบเพื่อใช้งาน</Text>
-
-          {/* อีเมล */}
+          {}
           <Text style={styles.label}>อีเมล</Text>
           <TextInput
             style={styles.input}
@@ -65,9 +58,8 @@ export default function LoginScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-
-          {/* รหัสผ่าน */}
-          <Text style={styles.label}>พาสเวิร์ด</Text>
+          {}
+          <Text style={styles.label}>รหัสผ่าน</Text>
           <View style={styles.passwordRow}>
             <TextInput
               style={[styles.input, styles.passwordInput]}
@@ -81,11 +73,10 @@ export default function LoginScreen() {
               style={styles.eyeBtn}
               onPress={() => setShowPassword(!showPassword)}
             >
-              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁'}</Text>
+              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
             </TouchableOpacity>
           </View>
-
-          {/* แถว จดจำฉัน / ลืมรหัสผ่าน */}
+          {}
           <View style={styles.row}>
             <TouchableOpacity
               style={styles.rememberWrap}
@@ -97,13 +88,11 @@ export default function LoginScreen() {
               </View>
               <Text style={styles.rememberText}>จดจำฉัน</Text>
             </TouchableOpacity>
-
             <TouchableOpacity>
               <Text style={styles.forgotText}>ลืมรหัสผ่าน ?</Text>
             </TouchableOpacity>
           </View>
-
-          {/* ปุ่ม Login */}
+          {}
           <TouchableOpacity
             style={[styles.btnPrimary, loading && styles.btnDisabled]}
             onPress={handleLogin}
@@ -115,29 +104,24 @@ export default function LoginScreen() {
               : <Text style={styles.btnText}>เข้าสู่ระบบ</Text>
             }
           </TouchableOpacity>
-
-          {/* สมัครสมาชิก */}
+          {}
           <TouchableOpacity
             style={styles.registerWrap}
             onPress={() => router.push('/(auth)/register' as any)}
           >
             <Text style={styles.registerText}>
-              ยังไม่มีบัญชีใช่ไหม?{' '}
+              ยังไม่มีบัญชีใช่หรือ?{' '}
               <Text style={styles.registerLink}>สมัครสมาชิก</Text>
             </Text>
           </TouchableOpacity>
-
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   )
 }
-
-// ─────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Brand.card },
   content: { flex: 1, paddingHorizontal: 28, justifyContent: 'center' },
-
   appName: {
     fontSize: 34, fontWeight: '800',
     color: Brand.primary, textAlign: 'center', letterSpacing: 0.5,
@@ -150,7 +134,6 @@ const styles = StyleSheet.create({
     fontSize: 13, color: Brand.textSecondary,
     textAlign: 'center', marginTop: 6, marginBottom: 32,
   },
-
   label: { fontSize: 14, color: Brand.text, marginBottom: 8, marginTop: 4 },
   input: {
     borderRadius: 12,
@@ -162,7 +145,6 @@ const styles = StyleSheet.create({
   passwordInput: { paddingRight: 48 },
   eyeBtn: { position: 'absolute', right: 6, padding: 12, bottom: 6 },
   eyeIcon: { fontSize: 18 },
-
   row: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 28, marginTop: 2,
@@ -177,14 +159,12 @@ const styles = StyleSheet.create({
   checkboxTick: { color: '#fff', fontSize: 12, fontWeight: '800' },
   rememberText: { fontSize: 14, color: Brand.textSecondary },
   forgotText: { fontSize: 14, color: Brand.primary, fontWeight: '600' },
-
   btnPrimary: {
     backgroundColor: Brand.primary, borderRadius: 14,
     paddingVertical: 16, alignItems: 'center',
   },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
   registerWrap: { marginTop: 22, alignItems: 'center' },
   registerText: { fontSize: 14, color: Brand.textSecondary },
   registerLink: { color: Brand.danger, fontWeight: '700' },

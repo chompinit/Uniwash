@@ -12,14 +12,12 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
-
 const ITEM_LABELS: Record<string, string> = {
   shirt: 'เสื้อผ้า',
   pant: 'กางเกง',
   underwear: 'ชุดชั้นใน',
   bedsheet: 'ผ้าปูที่นอน',
 }
-
 type OrderDetail = {
   id: string
   order_number: string
@@ -34,9 +32,7 @@ type OrderDetail = {
   created_at: string
   order_items: { item_type: string; quantity: number; price_per_item: number }[]
 }
-
 type Customer = { full_name: string | null; phone: string | null }
-
 export default function RiderJobScreen() {
   const { orderId } = useLocalSearchParams()
   const [order, setOrder] = useState<OrderDetail | null>(null)
@@ -44,28 +40,23 @@ export default function RiderJobScreen() {
   const [myId, setMyId] = useState('')
   const [loading, setLoading] = useState(true)
   const [acting, setActing] = useState(false)
-
   useEffect(() => {
     fetchOrder()
   }, [])
-
   const fetchOrder = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) setMyId(user.id)
-
     const { data, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
       .eq('id', orderId)
       .single()
-
     if (error || !data) {
       Alert.alert('Error', error?.message ?? 'ไม่พบออเดอร์')
       setLoading(false)
       return
     }
     setOrder(data)
-
     const { data: prof } = await supabase
       .from('profiles')
       .select('full_name, phone')
@@ -74,8 +65,7 @@ export default function RiderJobScreen() {
     setCustomer(prof)
     setLoading(false)
   }
-
-  // รับงาน — กันแย่งงานกันด้วยเงื่อนไข employee_id ยังว่าง
+  // รับงาน — อันแรกงานอันดี้วยเงื่อนไขไข employee_id ยังว่าง
   const handleAccept = async () => {
     setActing(true)
     const { data, error } = await supabase
@@ -84,7 +74,6 @@ export default function RiderJobScreen() {
       .eq('id', orderId)
       .is('employee_id', null)
       .select()
-
     setActing(false)
     if (error) {
       Alert.alert('Error', error.message)
@@ -97,7 +86,6 @@ export default function RiderJobScreen() {
     }
     fetchOrder()
   }
-
   const handlePickup = async () => {
     setActing(true)
     const { error } = await supabase
@@ -112,7 +100,6 @@ export default function RiderJobScreen() {
     }
     fetchOrder()
   }
-
   const handleDelivered = () => {
     Alert.alert('ยืนยัน', 'ส่งผ้าคืนลูกค้าเรียบร้อยแล้ว?', [
       { text: 'ยังไม่ส่ง', style: 'cancel' },
@@ -135,7 +122,6 @@ export default function RiderJobScreen() {
       },
     ])
   }
-
   const openMap = () => {
     if (!order) return
     const url = order.delivery_lat && order.delivery_lng
@@ -143,11 +129,9 @@ export default function RiderJobScreen() {
       : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.delivery_address)}`
     Linking.openURL(url)
   }
-
   const callCustomer = () => {
     if (customer?.phone) Linking.openURL(`tel:${customer.phone}`)
   }
-
   if (loading || !order) {
     return (
       <SafeAreaView style={styles.container}>
@@ -155,10 +139,8 @@ export default function RiderJobScreen() {
       </SafeAreaView>
     )
   }
-
   const isMine = order.employee_id === myId
   const isUnassigned = !order.employee_id
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -168,10 +150,8 @@ export default function RiderJobScreen() {
         <Text style={styles.headerTitle}>#{order.order_number}</Text>
         <View style={{ width: 40 }} />
       </View>
-
       <ScrollView style={styles.content}>
-
-        {/* ลูกค้า */}
+        {}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>👤 ลูกค้า</Text>
           <Text style={styles.custName}>{customer?.full_name || 'ไม่ระบุชื่อ'}</Text>
@@ -180,11 +160,10 @@ export default function RiderJobScreen() {
               <Text style={styles.callBtnText}>📞 โทร {customer.phone}</Text>
             </TouchableOpacity>
           ) : (
-            <Text style={styles.noPhone}>ไม่มีเบอร์ติดต่อ</Text>
+            <Text style={styles.noPhone}>ไม่มีเบอร์โทรติดต่อ</Text>
           )}
         </View>
-
-        {/* ที่อยู่ */}
+        {}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📍 ที่อยู่จัดส่ง</Text>
           <Text style={styles.addressText}>{order.delivery_address}</Text>
@@ -197,8 +176,7 @@ export default function RiderJobScreen() {
             <Text style={styles.mapBtnText}>🗺️ นำทางด้วย Google Maps</Text>
           </TouchableOpacity>
         </View>
-
-        {/* รายการผ้า */}
+        {}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>🧺 รายการ</Text>
           {order.order_items.map((item, i) => (
@@ -212,10 +190,8 @@ export default function RiderJobScreen() {
             <Text style={styles.totalPrice}>{order.total_price} บาท</Text>
           </View>
         </View>
-
       </ScrollView>
-
-      {/* ปุ่มตามสถานะ */}
+      {}
       <View style={styles.footer}>
         {isUnassigned && order.status === 'pending' && (
           <TouchableOpacity
@@ -253,7 +229,6 @@ export default function RiderJobScreen() {
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F5F7' },
   header: {
@@ -264,10 +239,8 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, color: '#1C8A99' },
   headerTitle: { fontSize: 17, fontWeight: '700', color: '#2C2C2A' },
   content: { flex: 1, padding: 16 },
-
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12 },
   cardTitle: { fontSize: 13, fontWeight: '600', color: '#888780', marginBottom: 10 },
-
   custName: { fontSize: 16, fontWeight: '600', color: '#2C2C2A', marginBottom: 10 },
   callBtn: {
     borderWidth: 1.5, borderColor: '#1C8A99', borderRadius: 10,
@@ -275,7 +248,6 @@ const styles = StyleSheet.create({
   },
   callBtnText: { fontSize: 14, color: '#1C8A99', fontWeight: '600' },
   noPhone: { fontSize: 13, color: '#B4B2A9', fontStyle: 'italic' },
-
   addressText: { fontSize: 14, color: '#2C2C2A', lineHeight: 20, marginBottom: 10 },
   noteBox: {
     backgroundColor: '#FEF3E2', borderRadius: 10, padding: 10, marginBottom: 10,
@@ -286,7 +258,6 @@ const styles = StyleSheet.create({
     paddingVertical: 11, alignItems: 'center',
   },
   mapBtnText: { fontSize: 14, color: '#1C8A99', fontWeight: '600' },
-
   itemRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0',
@@ -296,7 +267,6 @@ const styles = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10 },
   totalLabel: { fontSize: 14, fontWeight: '600', color: '#2C2C2A' },
   totalPrice: { fontSize: 16, fontWeight: '700', color: '#1C8A99' },
-
   footer: {
     padding: 16, backgroundColor: '#fff',
     borderTopWidth: 0.5, borderTopColor: '#E0E0E0',

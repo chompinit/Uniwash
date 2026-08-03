@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router'
+﻿import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
-
 type OrderDetail = {
   id: string
   order_number: string
@@ -24,57 +23,48 @@ type OrderDetail = {
     price_per_item: number
   }[]
 }
-
 const ITEM_LABELS: Record<string, string> = {
-  shirt: 'เสื้อผ้า',
-  pant: 'กางเกง',
-  underwear: 'ชุดชั้นใน',
-  bedsheet: 'ผ้าปูที่นอน',
+  shirt: 'à¹€à¸ªà¸·à¹‰à¸­à¸œà¹‰à¸²',
+  pant: 'à¸à¸²à¸‡à¹€à¸à¸‡',
+  underwear: 'à¸Šà¸¸à¸”à¸Šà¸±à¹‰à¸™à¹ƒà¸™',
+  bedsheet: 'à¸œà¹‰à¸²à¸›à¸¹à¸—à¸µà¹ˆà¸™à¸­à¸™',
 }
-
 const STEPS = [
-  { key: 'pending', label: 'ชำระเงินเรียบร้อยแล้ว' },
-  { key: 'washing', label: 'กำลังซักผ้า' },
-  { key: 'delivered', label: 'จัดส่งผ้าเรียบร้อยแล้ว' },
+  { key: 'pending', label: 'à¸Šà¸³à¸£à¸°à¹€à¸‡à¸´à¸™à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§' },
+  { key: 'washing', label: 'à¸à¸³à¸¥à¸±à¸‡à¸‹à¸±à¸à¸œà¹‰à¸²' },
+  { key: 'delivered', label: 'à¸ˆà¸±à¸”à¸ªà¹ˆà¸‡à¸œà¹‰à¸²à¹€à¸£à¸µà¸¢à¸šà¸£à¹‰à¸­à¸¢à¹à¸¥à¹‰à¸§' },
 ]
-
 const STATUS_ORDER = ['pending', 'washing', 'delivered']
-
 export default function StatusScreen() {
   const { orderId, orderNumber } = useLocalSearchParams()
   const [order, setOrder] = useState<OrderDetail | null>(null)
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
     fetchOrder()
-
     const interval = setInterval(fetchOrder, 30000)
     return () => clearInterval(interval)
   }, [])
-
   const fetchOrder = async () => {
     const { data, error } = await supabase
       .from('orders')
       .select('*, order_items(*)')
       .eq('id', orderId)
       .single()
-
     if (!error) setOrder(data)
     setLoading(false)
   }
-
   const handleCancel = async () => {
-    Alert.alert('ยืนยัน', 'ต้องการยกเลิกออเดอร์นี้?', [
-      { text: 'ไม่', style: 'cancel' },
+    Alert.alert('à¸¢à¸·à¸™à¸¢à¸±à¸™', 'à¸•à¹‰à¸­à¸‡à¸à¸²à¸£à¸¢à¸à¹€à¸¥à¸´à¸à¸­à¸­à¹€à¸”à¸­à¸£à¹Œà¸™à¸µà¹‰?', [
+      { text: 'à¹„à¸¡à¹ˆ', style: 'cancel' },
       {
-        text: 'ยกเลิก', style: 'destructive',
+        text: 'à¸¢à¸à¹€à¸¥à¸´à¸', style: 'destructive',
         onPress: async () => {
-          // ใช้ RPC เพื่อคืนเหรียญที่จ่ายไปแล้วด้วย
+          // à¹ƒà¸Šà¹‰ RPC à¹€à¸žà¸·à¹ˆà¸­à¸„à¸·à¸™à¹€à¸«à¸£à¸µà¸¢à¸à¸—à¸µà¹ˆà¸ˆà¹ˆà¸²à¸¢à¹„à¸›à¹à¸¥à¹‰à¸§à¸”à¹‰à¸§à¸¢
           const { error } = await supabase.rpc('cancel_order_refund', {
             p_order_id: orderId,
           })
           if (error) {
-            Alert.alert('ยกเลิกไม่สำเร็จ', error.message)
+            Alert.alert('à¸¢à¸à¹€à¸¥à¸´à¸à¹„à¸¡à¹ˆà¸ªà¸³à¹€à¸£à¹‡à¸ˆ', error.message)
             return
           }
           router.replace('/(customer)/packages' as any)
@@ -82,9 +72,7 @@ export default function StatusScreen() {
       },
     ])
   }
-
   const currentStepIndex = STATUS_ORDER.indexOf(order?.status || 'pending')
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -92,22 +80,19 @@ export default function StatusScreen() {
       </SafeAreaView>
     )
   }
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backChip} onPress={() => router.back()}>
-          <Text style={styles.backChipText}>‹</Text>
+          <Text style={styles.backChipText}>â€¹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ติดตามสถานะ</Text>
+        <Text style={styles.headerTitle}>à¸•à¸´à¸”à¸•à¸²à¸¡à¸ªà¸–à¸²à¸™à¸°</Text>
         <View style={{ width: 36 }} />
       </View>
-
       <ScrollView style={styles.content}>
-
-        {/* หัวออเดอร์ตามม็อกอัป */}
+        {}
         <View style={styles.orderHead}>
-          <Text style={styles.orderNum}>ผ้าของ #{order?.order_number || orderNumber}</Text>
+          <Text style={styles.orderNum}>à¸œà¹‰à¸²à¸‚à¸­à¸‡ #{order?.order_number || orderNumber}</Text>
           <Text style={styles.orderDate}>
             Orderd. At{' '}
             {order?.created_at
@@ -115,7 +100,7 @@ export default function StatusScreen() {
                   day: '2-digit', month: '2-digit', year: '2-digit',
                   hour: '2-digit', minute: '2-digit',
                 })
-              : ''}{' '}น.
+              : ''}{' '}à¸™.
           </Text>
           {order?.order_items?.map((item, i) => (
             <Text key={i} style={styles.orderItem}>
@@ -123,17 +108,14 @@ export default function StatusScreen() {
             </Text>
           ))}
         </View>
-
-        {/* STATUS watermark + timeline จุดส้ม */}
+        {}
         <View style={styles.statusZone}>
           <Text style={styles.watermark}>STATUS</Text>
-
           <View style={styles.timeline}>
             {STEPS.map((step, index) => {
               const isDone = index < currentStepIndex
               const isActive = index === currentStepIndex
               const reached = isDone || isActive
-
               return (
                 <View key={step.key}>
                   <View style={styles.stepItem}>
@@ -150,27 +132,23 @@ export default function StatusScreen() {
             })}
           </View>
         </View>
-
       </ScrollView>
-
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.btnHome}
           onPress={() => router.replace('/(customer)/packages' as any)}
         >
-          <Text style={styles.btnHomeText}>กลับสู่หน้าหลัก</Text>
+          <Text style={styles.btnHomeText}>à¸à¸¥à¸±à¸šà¸ªà¸¹à¹ˆà¸«à¸™à¹‰à¸²à¸«à¸¥à¸±à¸</Text>
         </TouchableOpacity>
-
         {order?.status === 'pending' && (
           <TouchableOpacity style={styles.btnCancel} onPress={handleCancel}>
-            <Text style={styles.btnCancelText}>ยกเลิกออเดอร์</Text>
+            <Text style={styles.btnCancelText}>à¸¢à¸à¹€à¸¥à¸´à¸à¸­à¸­à¹€à¸”à¸­à¸£à¹Œ</Text>
           </TouchableOpacity>
         )}
       </View>
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
@@ -185,12 +163,10 @@ const styles = StyleSheet.create({
   backChipText: { fontSize: 22, color: '#1B1C2A', fontWeight: '600', marginTop: -2 },
   headerTitle: { fontSize: 16, fontWeight: '600', color: '#1B1C2A' },
   content: { flex: 1, padding: 20 },
-
   orderHead: { marginBottom: 8 },
   orderNum: { fontSize: 15, fontWeight: '700', color: '#1B1C2A' },
   orderDate: { fontSize: 12, color: '#8A8F98', marginTop: 3, marginBottom: 6 },
   orderItem: { fontSize: 12, color: '#8A8F98', lineHeight: 18 },
-
   statusZone: { paddingTop: 10 },
   watermark: {
     fontSize: 44, fontWeight: '800', color: '#E6E8EB',
@@ -208,7 +184,6 @@ const styles = StyleSheet.create({
   stepLineDone: { backgroundColor: '#F08A24' },
   stepTitle: { fontSize: 14, fontWeight: '600', color: '#1B1C2A' },
   stepTitleDim: { color: '#B4B2A9' },
-
   footer: { padding: 16, gap: 8 },
   btnHome: {
     backgroundColor: '#16161F', borderRadius: 12,

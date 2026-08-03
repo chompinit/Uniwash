@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router'
 import { Text } from 'react-native'
 import { Brand } from '../../constants/theme'
 
-// แถบล่าง 3 ปุ่มตามม็อกอัป: สั่งซัก ✏️ / รายการ ☰ / โปรไฟล์ 👤 บนพื้น teal
+// แท็บลายเป็น 3 ปุ่มตามมั่นตาม: สั่งซัก ✓ / รายการ ☰ / โปรไฟล์ 👤 บนพื้น teal
 function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
   return <Text style={{ fontSize: 24, opacity: focused ? 1 : 0.55 }}>{emoji}</Text>
 }
@@ -24,7 +24,7 @@ export default function CustomerLayout() {
     >
       <Tabs.Screen
         name="packages"
-        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="📝" focused={focused} /> }}
+        options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="🛍️" focused={focused} /> }}
       />
       <Tabs.Screen
         name="orders"
@@ -35,7 +35,6 @@ export default function CustomerLayout() {
         options={{ tabBarIcon: ({ focused }) => <TabIcon emoji="👤" focused={focused} /> }}
       />
 
-      {/* หน้าในโฟลว์ — ไม่แสดงเป็นแท็บ */}
       <Tabs.Screen name="select" options={{ href: null }} />
       <Tabs.Screen name="summary" options={{ href: null }} />
       <Tabs.Screen name="status" options={{ href: null }} />

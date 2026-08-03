@@ -17,530 +17,387 @@ import {
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
 import { pickPhoto, uploadOrderPhoto } from '../../../lib/uploadPhoto'
-
-const ITEM_LABELS: Record<string, string> = {
-  shirt: 'เสื้อผ้า',
-  pant: 'กางเกง',
-  underwear: 'ชุดชั้นใน',
-  bedsheet: 'ผ้าปูที่นอน',
-}
-
-const ITEM_PRICES: Record<string, number> = {
-  shirt: 9, pant: 9, underwear: 3, bedsheet: 20,
-}
-
-const PRODUCT_NAMES: Record<string, string> = {
-  p1: 'น้ำยาซักของร้าน',
-  p2: 'Bleach',
-  p3: 'Comfort',
-}
-
-const PRODUCT_PRICES: Record<string, number> = {
-  p1: 10, p2: 10, p3: 15,
-}
-
+type LaundryItem = { id: string; name: string; price: number }
+type ClothingItem = { id: string; name: string; price: number }
 export default function SummaryScreen() {
-  const { packageId, quantities, productId, totalPrice } = useLocalSearchParams()
-
+  const { packageId, quantities, laundryId, totalPrice } = useLocalSearchParams()
   const parsedQty: Record<string, number> = quantities
     ? JSON.parse(quantities as string)
     : {}
-
-  const [address, setAddress]           = useState('')
-  const [noteText, setNoteText]         = useState('')
-  const [lat, setLat]                   = useState<number | null>(null)
-  const [lng, setLng]                   = useState<number | null>(null)
-  const [locLoading, setLocLoading]     = useState(false)
-  const [editModalVisible, setEditModalVisible] = useState(false)
-  const [draftAddress, setDraftAddress] = useState('')
-  const [photoUri, setPhotoUri]         = useState<string | null>(null)
-
-  const [loading, setLoading] = useState(false)
-
+  const [clothingItems, setClothingItems] = useState<Record<string, ClothingItem>>({})
+  const [laundryItem, setLaundryItem] = useState<LaundryItem | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [address, setAddress] = useState('')
+  const [noteText, setNoteText] = useState('')
+  const [photo, setPhoto] = useState<{ uri: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [modalVisible, setModalVisible] = useState(false)
+  const [paymentMethod, setPaymentMethod] = useState<'qr' | 'coins'>('qr')
   useEffect(() => {
-    loadSavedAddress()
+    fetchProducts()
   }, [])
-
-  const loadSavedAddress = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data } = await supabase
-      .from('profiles')
-      .select('default_address, default_lat, default_lng')
-      .eq('id', user.id)
-      .single()
-
-    if (data?.default_address) {
-      setAddress(data.default_address)
-      setLat(data.default_lat ?? null)
-      setLng(data.default_lng ?? null)
+  const fetchProducts = async () => {
+    try {
+      // Get clothing items
+      const clothingIds = Object.keys(parsedQty).filter(id => parsedQty[id] > 0)
+      if (clothingIds.length > 0) {
+        const { data: clothingData } = await supabase
+          .from('clothing_items')
+          .select('id, name, price')
+          .in('id', clothingIds)
+        const clothingMap: Record<string, ClothingItem> = {}
+        clothingData?.forEach(item => {
+          clothingMap[item.id] = item
+        })
+        setClothingItems(clothingMap)
+      }
+      // Get laundry item
+      if (laundryId) {
+        const { data: laundryData } = await supabase
+          .from('laundry_items')
+          .select('id, name, price')
+          .eq('id', laundryId as string)
+          .single()
+        if (laundryData) {
+          setLaundryItem(laundryData)
+        }
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.message)
+    } finally {
+      setLoading(false)
     }
   }
-
-  const handleUseGPS = async () => {
-    setLocLoading(true)
+  const handleAddPhoto = async () => {
     try {
-      const servicesEnabled = await Location.hasServicesEnabledAsync()
-      if (!servicesEnabled) {
-        Alert.alert(
-          'GPS ปิดอยู่',
-          'กรุณาเปิด Location Services ในการตั้งค่าเครื่องก่อนใช้งาน',
-          [
-            { text: 'ยกเลิก', style: 'cancel' },
-            { text: 'เปิดการตั้งค่า', onPress: () => Linking.openSettings() },
-          ]
-        )
-        setLocLoading(false)
-        return
+      const result = await pickPhoto()
+      if (result) {
+        setPhoto({ uri: result })
       }
-
-      const { status } = await Location.requestForegroundPermissionsAsync()
-      if (status !== 'granted') {
-        Alert.alert(
-          'ไม่ได้รับอนุญาต',
-          'กรุณาอนุญาตให้แอปเข้าถึงตำแหน่งในการตั้งค่า',
-          [
-            { text: 'ยกเลิก', style: 'cancel' },
-            { text: 'เปิดการตั้งค่า', onPress: () => Linking.openSettings() },
-          ]
-        )
-        setLocLoading(false)
-        return
-      }
-
-      let loc = await Location.getLastKnownPositionAsync()
-      if (!loc) {
-        loc = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Lowest,
+    } catch (error: any) {
+      Alert.alert('Error', error.message)
+    }
+  }
+  const handleConfirmOrder = async () => {
+    if (!address.trim()) {
+      Alert.alert('Required', 'กรุณากรอกที่อยู่')
+      return
+    }
+    try {
+      setUploading(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
+      // Upload photo will be handled after order is created
+      let photoUrl = ''
+      // Create order
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .insert([{
+          customer_id: user.id,
+          package_id: packageId,
+          total_price: parseInt(totalPrice as string),
+          status: 'pending',
+          pickup_address: address,
+          notes: noteText,
+        }])
+        .select()
+        .single()
+      if (orderError) throw orderError
+      // Add order items
+      const items = Object.entries(parsedQty)
+        .filter(([_, qty]) => qty > 0)
+        .map(([itemId, qty]) => ({
+          order_id: orderData.id,
+          item_type: 'clothing',
+          item_id: itemId,
+          quantity: qty,
+        }))
+      if (laundryId) {
+        items.push({
+          order_id: orderData.id,
+          item_type: 'laundry',
+          item_id: laundryId as string,
+          quantity: 1,
         })
       }
-      const { latitude, longitude } = loc.coords
-      setLat(latitude)
-      setLng(longitude)
-
-      try {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=th`,
-          { headers: { 'User-Agent': 'UniWashApp/1.0' } }
-        )
-        const json = await res.json()
-        if (json?.display_name) {
-          setAddress(json.display_name)
-        } else {
-          setAddress(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .insert(items)
+      if (itemsError) throw itemsError
+      // Upload delivery photo if exists
+      if (photo) {
+        try {
+          photoUrl = await uploadOrderPhoto(orderData.id, 'customer', photo.uri)
+        } catch (photoErr: any) {
+          console.error('Photo upload error:', photoErr)
         }
-      } catch {
-        setAddress(`${latitude.toFixed(5)}, ${longitude.toFixed(5)}`)
       }
-    } catch (err: any) {
-      Alert.alert('เกิดข้อผิดพลาด', err?.message ?? String(err))
-    }
-    setLocLoading(false)
-  }
-
-  const saveAddressToProfile = async (addr: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    await supabase
-      .from('profiles')
-      .update({
-        default_address: addr,
-        default_lat: lat,
-        default_lng: lng,
-      })
-      .eq('id', user.id)
-  }
-
-  const handleEditConfirm = async () => {
-    const trimmed = draftAddress.trim()
-    if (!trimmed) {
-      Alert.alert('แจ้งเตือน', 'กรุณากรอกที่อยู่')
-      return
-    }
-    setAddress(trimmed)
-    setLat(null)
-    setLng(null)
-    setEditModalVisible(false)
-    await saveAddressToProfile(trimmed)
-  }
-
-  const handlePickPhoto = async () => {
-    try {
-      const uri = await pickPhoto(false)
-      if (uri) setPhotoUri(uri)
-    } catch (err: any) {
-      Alert.alert('เกิดข้อผิดพลาด', err?.message ?? String(err))
-    }
-  }
-
-  const handleConfirm = async () => {
-    if (!address.trim()) {
-      Alert.alert('แจ้งเตือน', 'กรุณากำหนดที่อยู่จัดส่งก่อน')
-      return
-    }
-
-    setLoading(true)
-
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-      Alert.alert('Error', 'กรุณาเข้าสู่ระบบใหม่')
-      setLoading(false)
-      return
-    }
-
-    const orderNumber = 'OD' + Date.now().toString().slice(-4)
-
-    const { data: order, error } = await supabase
-      .from('orders')
-      .insert({
-        order_number: orderNumber,
-        customer_id: user.id,
-        package_id: packageId,
-        status: 'pending',
-        total_price: Number(totalPrice),
-        delivery_address: address.trim(),
-        delivery_note: noteText.trim() || null,
-        delivery_lat: lat,
-        delivery_lng: lng,
-      })
-      .select()
-      .single()
-
-    if (error) {
-      Alert.alert('Error', error.message)
-      setLoading(false)
-      return
-    }
-
-    const items = Object.entries(parsedQty)
-      .filter(([_, qty]) => qty > 0)
-      .map(([type, qty]) => ({
-        order_id: order.id,
-        item_type: type,
-        quantity: qty,
-        price_per_item: ITEM_PRICES[type] || 0,
-      }))
-
-    await supabase.from('order_items').insert(items)
-
-    // หักเหรียญแบบ atomic ฝั่ง DB — ถ้าเหรียญไม่พอจะ error และยกเลิกออเดอร์
-    const { error: payErr } = await supabase.rpc('pay_order_with_coins', {
-      p_order_id: order.id,
-    })
-
-    if (payErr) {
-      await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id)
-      setLoading(false)
-      Alert.alert('ชำระเงินไม่สำเร็จ', payErr.message, [
-        { text: 'ปิด', style: 'cancel' },
-        { text: '🪙 ไปเติมเหรียญ', onPress: () => router.push('/(customer)/coins' as any) },
+      Alert.alert('Success', 'ออเดอร์สำเร็จ', [
+        {
+          text: 'ดูรายละเอียด',
+          onPress: () =>
+            router.push({
+              pathname: '/(customer)/order-detail' as any,
+              params: { orderId: orderData.id },
+            }),
+        },
       ])
-      return
+    } catch (error: any) {
+      Alert.alert('Error', error.message)
+    } finally {
+      setUploading(false)
     }
-
-    // อัปโหลดรูปตะกร้าผ้าของลูกค้า (ถ้ามี) — พลาดได้โดยไม่ล้มออเดอร์
-    if (photoUri) {
-      try {
-        await uploadOrderPhoto(order.id, 'customer', photoUri)
-      } catch {}
-    }
-
-    await saveAddressToProfile(address.trim())
-
-    setLoading(false)
-
-    router.replace({
-      pathname: '/(customer)/status' as any,
-      params: { orderId: order.id, orderNumber },
-    })
   }
-
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#1C8A99" />
+      </View>
+    )
+  }
   return (
     <SafeAreaView style={styles.container}>
-
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backChip} onPress={() => router.back()}>
-          <Text style={styles.backChipText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>สรุปรายการ</Text>
-        <View style={{ width: 36 }} />
-      </View>
-
-      <ScrollView style={styles.content}>
-
-        {/* รายละเอียดแพ็กเกจ — ตารางตามม็อกอัป */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>รายละเอียดแพ็กเกจ</Text>
-          <View style={styles.tableHead}>
-            <Text style={[styles.thText, { flex: 1 }]}>ชนิด</Text>
-            <Text style={[styles.thText, { width: 56, textAlign: 'center' }]}>จำนวน</Text>
-            <Text style={[styles.thText, { width: 64, textAlign: 'right' }]}>ราคา</Text>
-          </View>
-          {Object.entries(parsedQty)
-            .filter(([_, qty]) => qty > 0)
-            .map(([type, qty]) => (
-              <View key={type} style={styles.sumRow}>
-                <Text style={styles.sumLabel}>{ITEM_LABELS[type]}</Text>
-                <Text style={styles.sumQty}>{qty}</Text>
-                <Text style={styles.sumPrice}>{qty * ITEM_PRICES[type]} THB</Text>
-              </View>
-            ))}
-          <View style={styles.sumRow}>
-            <Text style={styles.sumLabel}>{PRODUCT_NAMES[productId as string]}</Text>
-            <Text style={styles.sumQty}>1</Text>
-            <Text style={styles.sumPrice}>{PRODUCT_PRICES[productId as string]} THB</Text>
-          </View>
+      <ScrollView>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Text style={styles.backText}>‹</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>สรุปรายการ</Text>
+          <View style={{ width: 30 }} />
         </View>
-
-        {/* เพิ่มรายละเอียด */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>เพิ่ม รายละเอียด</Text>
-          <Text style={styles.cardSub}>โปรดระบุรายละเอียดที่ต้องการเพิ่มเติม</Text>
+        {}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>รูปถ่ายตะกร้าผ้า</Text>
+          {photo ? (
+            <View style={styles.photoContainer}>
+              <Image source={{ uri: photo.uri }} style={styles.photo} />
+              <TouchableOpacity
+                style={styles.deletePhotoBtn}
+                onPress={() => setPhoto(null)}
+              >
+                <Text style={styles.deletePhotoBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={styles.addPhotoBtn}
+              onPress={handleAddPhoto}
+            >
+              <Text style={styles.addPhotoBtnText}>📷 เพิ่มรูปถ่าย</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>เสื้อกางเกง</Text>
+          {Object.entries(parsedQty).map(([itemId, qty]) =>
+            qty > 0 && clothingItems[itemId] ? (
+              <View key={itemId} style={styles.itemRow}>
+                <Text style={styles.itemName}>{clothingItems[itemId].name}</Text>
+                <View style={styles.itemQtyPrice}>
+                  <Text style={styles.qty}>x{qty}</Text>
+                  <Text style={styles.price}>
+                    ฿{clothingItems[itemId].price * qty}
+                  </Text>
+                </View>
+              </View>
+            ) : null
+          )}
+        </View>
+        {}
+        {laundryItem && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>น้ำยา</Text>
+            <View style={styles.itemRow}>
+              <Text style={styles.itemName}>{laundryItem.name}</Text>
+              <Text style={styles.price}>฿{laundryItem.price}</Text>
+            </View>
+          </View>
+        )}
+        {}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ที่อยู่ส่ง</Text>
           <TextInput
-            style={styles.noteInput}
-            placeholder="เช่น ห้อง 302 ชั้น 3 กดกริ่งหน้าประตู"
-            placeholderTextColor="#B4B2A9"
+            style={styles.input}
+            placeholder="ป้อนที่อยู่"
+            value={address}
+            onChangeText={setAddress}
+            multiline
+          />
+        </View>
+        {}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>หมายเหตุ (ไม่บังคับ)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="เช่น อยากใช้น้ำอย่าง, หลีกเลี่ยงการตากแดด"
             value={noteText}
             onChangeText={setNoteText}
             multiline
-            numberOfLines={3}
           />
         </View>
-
-        {/* อัพโหลดรูปภาพ ตามม็อกอัป */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>อัพโหลดรูปภาพ</Text>
-          <Text style={styles.cardSub}>ถ่ายรูปตะกร้าผ้าของคุณเพื่อยืนยันจำนวน</Text>
-          <TouchableOpacity style={styles.uploadCircleWrap} onPress={handlePickPhoto}>
-            {photoUri ? (
-              <Image source={{ uri: photoUri }} style={styles.uploadPreview} />
-            ) : (
-              <View style={styles.uploadCircle}>
-                <Text style={{ fontSize: 22 }}>📷</Text>
-                <Text style={styles.uploadCircleText}>เพิ่ม</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* ที่อยู่ */}
-        <View style={styles.card}>
-          <View style={styles.addrHeader}>
-            <Text style={{ fontSize: 16 }}>📍</Text>
-            <Text style={styles.cardTitle}>ที่อยู่</Text>
+        {}
+        <View style={styles.totalSection}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>รวมทั้งสิ้น</Text>
+            <Text style={styles.totalPrice}>฿{totalPrice}</Text>
           </View>
-
-          {address ? (
-            <View style={styles.addrRow}>
-              <View style={styles.addrIcon}>
-                <Text style={{ fontSize: 18 }}>🏠</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.addrLabel}>บ้าน (ค่าเริ่มต้น)</Text>
-                <Text style={styles.addressText} numberOfLines={2}>{address}</Text>
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.addressPlaceholder}>ยังไม่ได้กำหนดที่อยู่</Text>
-          )}
-
-          <TouchableOpacity
-            style={styles.changeAddrBtn}
-            onPress={() => {
-              setDraftAddress(address)
-              setEditModalVisible(true)
-            }}
-          >
-            <Text style={styles.changeAddrText}>เปลี่ยนที่อยู่จัดส่ง</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gpsBtn} onPress={handleUseGPS} disabled={locLoading}>
-            {locLoading
-              ? <ActivityIndicator color="#1C8A99" size="small" />
-              : <Text style={styles.gpsBtnText}>📡 ใช้ตำแหน่งปัจจุบัน (GPS)</Text>
-            }
-          </TouchableOpacity>
         </View>
-
-      </ScrollView>
-
-      {/* Footer */}
-      <View style={styles.footer}>
-        <View style={styles.footerRow}>
-          <Text style={styles.footerLabel}>สรุปค่าใช้จ่าย{'\n'}ยอดรวมทั้งสิ้น</Text>
-          <Text style={styles.footerPrice}>{totalPrice} THB</Text>
-        </View>
+        {}
         <TouchableOpacity
-          style={[styles.btnPrimary, (loading || !address) && styles.btnDisabled]}
-          onPress={handleConfirm}
-          disabled={loading || !address}
+          style={styles.confirmBtn}
+          onPress={() => setModalVisible(true)}
+          disabled={uploading}
         >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.btnText}>ยืนยัน</Text>
-          }
+          <Text style={styles.confirmBtnText}>
+            {uploading ? 'กำลังบันทึก...' : 'ยืนยันการสั่งซื้อ'}
+          </Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Modal แก้ที่อยู่ */}
-      <Modal
-        visible={editModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
+        <View style={{ height: 30 }} />
+      </ScrollView>
+      {}
+      <Modal visible={modalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>กรอกที่อยู่จัดส่ง</Text>
-            <Text style={styles.modalSub}>
-              พิมพ์ชื่ออาคาร ห้อง ถนน แขวง/ตำบล เขต/อำเภอ จังหวัด
-            </Text>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="เช่น 123 ถ.รัชดาภิเษก แขวงดินแดง เขตดินแดง กรุงเทพฯ 10400"
-              placeholderTextColor="#B4B2A9"
-              value={draftAddress}
-              onChangeText={setDraftAddress}
-              multiline
-              numberOfLines={4}
-              autoFocus
-            />
-
-            <View style={styles.modalBtnRow}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>เลือกวิธีชำระเงิน</Text>
+            <TouchableOpacity
+              style={[
+                styles.paymentOption,
+                paymentMethod === 'qr' && styles.paymentOptionSelected,
+              ]}
+              onPress={() => setPaymentMethod('qr')}
+            >
+              <Text style={styles.paymentOptionText}>QR Code (PayPromptPay)</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.paymentOption,
+                paymentMethod === 'coins' && styles.paymentOptionSelected,
+              ]}
+              onPress={() => setPaymentMethod('coins')}
+            >
+              <Text style={styles.paymentOptionText}>คอยน์ของฉัน</Text>
+            </TouchableOpacity>
+            <View style={styles.modalActions}>
               <TouchableOpacity
-                style={styles.modalBtnCancel}
-                onPress={() => setEditModalVisible(false)}
+                style={styles.modalBtn}
+                onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.modalBtnCancelText}>ยกเลิก</Text>
+                <Text style={styles.modalBtnText}>ยกเลิก</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalBtnConfirm}
-                onPress={handleEditConfirm}
+                style={[styles.modalBtn, styles.modalBtnConfirm]}
+                onPress={handleConfirmOrder}
               >
-                <Text style={styles.modalBtnConfirmText}>บันทึก</Text>
+                <Text style={styles.modalBtnConfirmText}>ตกลง</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F5F7' },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    backgroundColor: '#fff', padding: 14,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#1C8A99',
   },
-  backChip: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: '#EEF1F4',
-    alignItems: 'center', justifyContent: 'center',
+  backText: { fontSize: 26, color: '#fff', fontWeight: '600' },
+  title: { fontSize: 18, fontWeight: '600', color: '#fff' },
+  section: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#e0e0e0' },
+  sectionTitle: { fontSize: 14, fontWeight: '600', marginBottom: 12, color: '#333' },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
-  backChipText: { fontSize: 22, color: '#1B1C2A', fontWeight: '600', marginTop: -2 },
-  headerTitle: { fontSize: 16, fontWeight: '600', color: '#1B1C2A' },
-  content: { flex: 1, padding: 16 },
-
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12 },
-  cardTitle: { fontSize: 13, fontWeight: '700', color: '#1B1C2A' },
-  cardSub: { fontSize: 11.5, color: '#8A8F98', marginTop: 2, marginBottom: 10 },
-
-  tableHead: {
-    flexDirection: 'row', paddingVertical: 8, marginTop: 8,
-    borderBottomWidth: 1, borderBottomColor: '#E6E8EB',
+  itemName: { fontSize: 13, color: '#666' },
+  itemQtyPrice: { flexDirection: 'row', gap: 12 },
+  qty: { fontSize: 13, color: '#999' },
+  price: { fontSize: 13, fontWeight: '600', color: '#1C8A99' },
+  addPhotoBtn: {
+    backgroundColor: '#e3f1f3',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  thText: { fontSize: 11.5, color: '#8A8F98', fontWeight: '600' },
-  sumRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0',
+  addPhotoBtnText: { fontSize: 16, color: '#1C8A99', fontWeight: '600' },
+  photoContainer: { position: 'relative' },
+  photo: { width: '100%', height: 200, borderRadius: 8 },
+  deletePhotoBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ff6b6b',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  sumLabel: { flex: 1, fontSize: 13, color: '#1B1C2A' },
-  sumQty: { width: 56, textAlign: 'center', fontSize: 13, color: '#8A8F98' },
-  sumPrice: { width: 64, textAlign: 'right', fontSize: 13, fontWeight: '500', color: '#1B1C2A' },
-
-  noteInput: {
-    borderWidth: 1, borderColor: '#E6E8EB', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 13, color: '#1B1C2A', backgroundColor: '#FAFAFA',
-    textAlignVertical: 'top', minHeight: 70,
+  deletePhotoBtnText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 80,
+    fontSize: 13,
   },
-
-  uploadCircleWrap: { alignItems: 'center', paddingVertical: 6 },
-  uploadCircle: {
-    width: 84, height: 84, borderRadius: 42,
-    backgroundColor: '#EEF1F4', borderWidth: 1.5, borderColor: '#E6E8EB',
-    alignItems: 'center', justifyContent: 'center',
+  totalSection: { padding: 16, backgroundColor: '#f5f5f5' },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  uploadCircleText: { fontSize: 11, color: '#8A8F98', marginTop: 2 },
-  uploadPreview: { width: 120, height: 120, borderRadius: 14 },
-
-  addrHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  addrRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  addrIcon: {
-    width: 42, height: 42, borderRadius: 21, backgroundColor: '#E3F1F3',
-    alignItems: 'center', justifyContent: 'center',
+  totalLabel: { fontSize: 16, fontWeight: '600', color: '#333' },
+  totalPrice: { fontSize: 24, fontWeight: '700', color: '#1C8A99' },
+  confirmBtn: {
+    backgroundColor: '#15707D',
+    margin: 16,
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  addrLabel: { fontSize: 13, fontWeight: '600', color: '#1B1C2A' },
-  addressText: { fontSize: 12, color: '#8A8F98', lineHeight: 17, marginTop: 2 },
-  addressPlaceholder: {
-    fontSize: 13, color: '#B4B2A9', marginBottom: 12, fontStyle: 'italic',
-  },
-  changeAddrBtn: {
-    backgroundColor: '#F5A04C', borderRadius: 20,
-    paddingVertical: 9, alignItems: 'center', marginBottom: 8,
-  },
-  changeAddrText: { fontSize: 13, color: '#fff', fontWeight: '700' },
-  gpsBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#1C8A99', borderRadius: 10,
-    paddingVertical: 10,
-  },
-  gpsBtnText: { fontSize: 13, color: '#1C8A99', fontWeight: '600' },
-
-  footer: {
-    padding: 16, backgroundColor: '#fff',
-    borderTopWidth: 0.5, borderTopColor: '#E6E8EB',
-  },
-  footerRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12,
-  },
-  footerLabel: { fontSize: 12, color: '#8A8F98', lineHeight: 18 },
-  footerPrice: { fontSize: 20, fontWeight: '800', color: '#1B1C2A' },
-  btnPrimary: { backgroundColor: '#1C8A99', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
-  btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-
+  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  modalCard: {
+  modalContent: {
+    width: '100%',
     backgroundColor: '#fff',
-    borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    padding: 24,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1B1C2A', marginBottom: 4 },
-  modalSub: { fontSize: 13, color: '#8A8F98', marginBottom: 16 },
-  modalInput: {
-    borderWidth: 1.5, borderColor: '#E6E8EB', borderRadius: 12,
-    paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: '#1B1C2A', backgroundColor: '#FAFAFA',
-    textAlignVertical: 'top', minHeight: 90, marginBottom: 20,
+  modalTitle: { fontSize: 18, fontWeight: '600', marginBottom: 20, color: '#333' },
+  paymentOption: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: '#f9f9f9',
   },
-  modalBtnRow: { flexDirection: 'row', gap: 10 },
-  modalBtnCancel: {
-    flex: 1, borderWidth: 1.5, borderColor: '#E6E8EB',
-    borderRadius: 12, paddingVertical: 13, alignItems: 'center',
+  paymentOptionSelected: { borderColor: '#1C8A99', backgroundColor: '#e3f1f3' },
+  paymentOptionText: { fontSize: 16, color: '#333', fontWeight: '500' },
+  modalActions: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  modalBtn: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+    alignItems: 'center',
   },
-  modalBtnCancelText: { fontSize: 15, color: '#8A8F98' },
-  modalBtnConfirm: {
-    flex: 1, backgroundColor: '#1C8A99',
-    borderRadius: 12, paddingVertical: 13, alignItems: 'center',
-  },
-  modalBtnConfirmText: { fontSize: 15, color: '#fff', fontWeight: '600' },
+  modalBtnText: { fontSize: 16, fontWeight: '600', color: '#333' },
+  modalBtnConfirm: { backgroundColor: '#1C8A99' },
+  modalBtnConfirmText: { fontSize: 16, fontWeight: '600', color: '#fff' },
 })

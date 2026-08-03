@@ -35,13 +35,11 @@ export default function OrdersScreen() {
   const fetchOrders = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const { data, error } = await supabase
       .from('orders')
       .select('id, order_number, status, total_price, created_at')
       .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
-
     if (!error) setOrders(data || [])
     setLoading(false)
   }, [])
@@ -64,16 +62,15 @@ export default function OrdersScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>สถานะรายการที่สั่งซื้อ</Text>
-        <Text style={styles.headerSub}>รายการที่สั่งซื้อ</Text>
+        <Text style={styles.headerTitle}>สถานะรายการสั่งซัก</Text>
+        <Text style={styles.headerSub}>รายการสั่งซักของคุณ</Text>
       </View>
-
       {loading ? (
         <ActivityIndicator size="large" color="#1C8A99" style={{ marginTop: 40 }} />
       ) : orders.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🧺</Text>
-          <Text style={styles.emptyText}>ยังไม่มีออเดอร์</Text>
+          <Text style={styles.emptyText}>ยังไม่มีอออเดอร์</Text>
         </View>
       ) : (
         <ScrollView
@@ -124,7 +121,6 @@ const styles = StyleSheet.create({
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyEmoji: { fontSize: 60, marginBottom: 12 },
   emptyText: { fontSize: 16, color: '#8A8F98' },
-
   groupLabel: { fontSize: 12, fontWeight: '700', color: '#8A8F98', marginBottom: 6 },
   orderCard: {
     backgroundColor: '#fff', borderRadius: 14,
@@ -132,21 +128,12 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  orderTop: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    marginBottom: 10, paddingBottom: 10,
-    borderBottomWidth: 1, borderBottomColor: '#16161F',
-  },
-  orderName: { fontSize: 14, fontWeight: '600', color: '#1B1C2A' },
-  orderDate: { fontSize: 12, color: '#1B1C2A', fontWeight: '500' },
-  orderStatus: { fontSize: 11, color: '#8A8F98', marginTop: 3 },
-  orderBottom: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-  },
-  priceValue: { fontSize: 14, fontWeight: '700', color: '#1B1C2A' },
-  detailChip: {
-    backgroundColor: '#CDE7EB', borderRadius: 16,
-    paddingHorizontal: 14, paddingVertical: 6,
-  },
-  detailChipText: { fontSize: 12, fontWeight: '600', color: '#15707D' },
+  orderTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  orderName: { fontSize: 14, fontWeight: '700', color: '#1B1C2A' },
+  orderDate: { fontSize: 12, color: '#8A8F98' },
+  orderStatus: { fontSize: 12, fontWeight: '600', color: '#1C8A99', marginTop: 2 },
+  orderBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  priceValue: { fontSize: 16, fontWeight: '700', color: '#1C8A99' },
+  detailChip: { backgroundColor: '#E3F1F3', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
+  detailChipText: { fontSize: 12, color: '#1C8A99', fontWeight: '600' },
 })

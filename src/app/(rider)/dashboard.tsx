@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
-
 type Order = {
   id: string
   order_number: string
@@ -21,17 +20,14 @@ type Order = {
   created_at: string
   employee_id: string | null
 }
-
 export default function RiderDashboard() {
   const [newJobs, setNewJobs] = useState<Order[]>([])
   const [myJobs, setMyJobs] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-
   const fetchJobs = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-
     const [newRes, mineRes] = await Promise.all([
       // งานใหม่ = จ่ายแล้ว ยังไม่มีคนรับ
       supabase.from('orders').select('*')
@@ -45,34 +41,28 @@ export default function RiderDashboard() {
         .in('status', ['pending', 'washing'])
         .order('created_at', { ascending: true }),
     ])
-
     setNewJobs((newRes.data as Order[]) ?? [])
     setMyJobs((mineRes.data as Order[]) ?? [])
     setLoading(false)
   }, [])
-
   useEffect(() => {
     fetchJobs()
     const interval = setInterval(fetchJobs, 30000)
     return () => clearInterval(interval)
   }, [fetchJobs])
-
   const onRefresh = async () => {
     setRefreshing(true)
     await fetchJobs()
     setRefreshing(false)
   }
-
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.replace('/(auth)/login' as any)
   }
-
   const formatDate = (d: string) =>
     new Date(d).toLocaleDateString('th-TH', {
       day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
     })
-
   const renderJob = (order: Order, isMine: boolean) => (
     <TouchableOpacity
       key={order.id}
@@ -101,7 +91,6 @@ export default function RiderDashboard() {
       </View>
     </TouchableOpacity>
   )
-
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -115,7 +104,6 @@ export default function RiderDashboard() {
           </TouchableOpacity>
         </View>
       </View>
-
       {loading ? (
         <ActivityIndicator size="large" color="#1C8A99" style={{ marginTop: 40 }} />
       ) : (
@@ -129,7 +117,6 @@ export default function RiderDashboard() {
           ) : (
             myJobs.map((o) => renderJob(o, true))
           )}
-
           <Text style={[styles.sectionLabel, { marginTop: 20 }]}>
             งานใหม่รอรับ ({newJobs.length})
           </Text>
@@ -138,14 +125,12 @@ export default function RiderDashboard() {
           ) : (
             newJobs.map((o) => renderJob(o, false))
           )}
-
           <View style={{ height: 24 }} />
         </ScrollView>
       )}
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F5F7' },
   header: {
@@ -159,7 +144,6 @@ const styles = StyleSheet.create({
   content: { flex: 1, padding: 16 },
   sectionLabel: { fontSize: 13, color: '#888780', marginBottom: 10, fontWeight: '600' },
   emptyText: { fontSize: 13, color: '#B4B2A9', fontStyle: 'italic', marginBottom: 8 },
-
   jobCard: {
     backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 10,
   },

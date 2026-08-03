@@ -1,14 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
 
@@ -17,7 +17,6 @@ export default function OTPScreen() {
     email: string
     type: 'signup' | 'recovery'
   }>()
-
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
   const [countdown, setCountdown] = useState(60)
@@ -39,17 +38,14 @@ export default function OTPScreen() {
 
   const handleChange = (text: string, index: number) => {
     const cleaned = text.replace(/[^0-9]/g, '')
-
     if (cleaned.length === 6) {
       setOtp(cleaned.split(''))
       inputRefs.current[5]?.focus()
       return
     }
-
     const newOtp = [...otp]
     newOtp[index] = cleaned.slice(-1)
     setOtp(newOtp)
-
     if (cleaned && index < 5) {
       inputRefs.current[index + 1]?.focus()
     }
@@ -67,24 +63,19 @@ export default function OTPScreen() {
       Alert.alert('แจ้งเตือน', 'กรุณากรอก OTP ให้ครบ 6 หลัก')
       return
     }
-
     setLoading(true)
-
     const { error } = await supabase.auth.verifyOtp({
       email: email,
       token: code,
       type: type === 'signup' ? 'signup' : 'recovery',
     })
-
     setLoading(false)
-
     if (error) {
-      Alert.alert('OTP ไม่ถูกต้อง', 'กรุณาตรวจสอบ OTP หรือขอรหัสใหม่')
+      Alert.alert('OTP ไม่ถูกต้อง', 'กรุณาตรวจสอบ OTP หรือขอใหม่')
       setOtp(['', '', '', '', '', ''])
       inputRefs.current[0]?.focus()
       return
     }
-
     if (type === 'signup') {
       Alert.alert('สำเร็จ! 🎉', 'ยืนยันตัวตนเรียบร้อยแล้ว', [
         {
@@ -100,19 +91,15 @@ export default function OTPScreen() {
   const handleResend = async () => {
     if (!canResend) return
     setLoading(true)
-
     const { error } = await supabase.auth.resend({
       type: 'signup',
       email: email,
     })
-
     setLoading(false)
-
     if (error) {
       Alert.alert('เกิดข้อผิดพลาด', error.message)
       return
     }
-
     setOtp(['', '', '', '', '', ''])
     setCountdown(60)
     setCanResend(false)
@@ -125,17 +112,14 @@ export default function OTPScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Text style={styles.backText}>← กลับ</Text>
         </TouchableOpacity>
-
         <Text style={styles.appName}>UNIWASH</Text>
         <Text style={styles.title}>ยืนยันอีเมล</Text>
-        <Text style={styles.desc}>เราได้ส่งรหัส OTP 6 หลักไปที่</Text>
+        <Text style={styles.desc}>เรารับส่งรหัส OTP 6 หลักไปที่</Text>
         <Text style={styles.emailText}>{email}</Text>
 
-        {}
         <View style={styles.otpRow}>
           {otp.map((digit, index) => (
             <TextInput
@@ -157,7 +141,6 @@ export default function OTPScreen() {
           ))}
         </View>
 
-        {}
         <TouchableOpacity
           style={[
             styles.btnPrimary,
@@ -173,7 +156,6 @@ export default function OTPScreen() {
           }
         </TouchableOpacity>
 
-        {}
         <View style={styles.resendRow}>
           <Text style={styles.resendLabel}>ไม่ได้รับ OTP? </Text>
           {canResend ? (
@@ -187,13 +169,11 @@ export default function OTPScreen() {
           )}
         </View>
 
-        {/* Tips */}
         <View style={styles.tipBox}>
           <Text style={styles.tipText}>
-            💡 ถ้าไม่เจออีเมล ลองเช็คกล่อง Spam หรือ Junk Mail
+            💡 ถ้าไม่เจอ อีเมล ลองเช็คกล่อง Spam หรือ Junk Mail
           </Text>
         </View>
-
       </View>
     </SafeAreaView>
   )

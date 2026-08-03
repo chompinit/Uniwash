@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
-
 type Package = {
   id: string
   name: string
@@ -20,24 +19,20 @@ type Package = {
   max_items: number
   delivery_km: number
 }
-
 export default function PackagesScreen() {
   const [packages, setPackages] = useState<Package[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
     fetchPackages()
     fetchProfile()
   }, [])
-
   const fetchPackages = async () => {
     const { data, error } = await supabase
       .from('packages')
       .select('*')
       .eq('is_active', true)
-
     if (error) {
       Alert.alert('Error', error.message)
     } else {
@@ -45,7 +40,6 @@ export default function PackagesScreen() {
     }
     setLoading(false)
   }
-
   const fetchProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -56,11 +50,9 @@ export default function PackagesScreen() {
       .single()
     setName(data?.full_name ?? '')
   }
-
   return (
     <SafeAreaView style={styles.container}>
-
-      {/* Header: DELIVER TO ตามม็อกอัป */}
+      {}
       <View style={styles.header}>
         <View>
           <Text style={styles.deliverTo}>DELIVER TO</Text>
@@ -73,11 +65,9 @@ export default function PackagesScreen() {
           <Text style={{ fontSize: 18 }}>{name ? name.charAt(0) : '👤'}</Text>
         </TouchableOpacity>
       </View>
-
-      {/* พื้น teal + การ์ดขาวตามม็อกอัป */}
+      {}
       <View style={styles.body}>
         <Text style={styles.heading}>กรุณาเลือกแพ็กเก็จ</Text>
-
         {loading ? (
           <ActivityIndicator size="large" color="#fff" style={{ marginTop: 40 }} />
         ) : (
@@ -97,7 +87,6 @@ export default function PackagesScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-
             <TouchableOpacity
               style={[styles.btnConfirm, !selectedId && styles.btnDisabled]}
               disabled={!selectedId}
@@ -110,16 +99,13 @@ export default function PackagesScreen() {
             >
               <Text style={styles.btnText}>ยืนยันแพ็กเก็จ</Text>
             </TouchableOpacity>
-
             <View style={{ height: 24 }} />
           </ScrollView>
         )}
       </View>
-
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
@@ -133,14 +119,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#E3F1F3',
     alignItems: 'center', justifyContent: 'center',
   },
-
   body: {
     flex: 1, backgroundColor: '#5FA8B3',
     borderTopLeftRadius: 4, borderTopRightRadius: 4,
     paddingHorizontal: 18, paddingTop: 16,
   },
   heading: { fontSize: 20, fontWeight: '700', color: '#1B1C2A', marginBottom: 14 },
-
   pkgCard: {
     backgroundColor: '#fff', borderRadius: 22,
     padding: 18, marginBottom: 14,
@@ -150,7 +134,6 @@ const styles = StyleSheet.create({
   pkgName: { fontSize: 16, fontWeight: '800', color: '#1B1C2A', marginBottom: 8 },
   pkgDesc: { fontSize: 13, color: '#8A8F98', lineHeight: 19, marginBottom: 6 },
   pkgInfo: { fontSize: 12.5, color: '#8A8F98', lineHeight: 19 },
-
   btnConfirm: {
     backgroundColor: '#15707D', borderRadius: 16,
     paddingVertical: 17, alignItems: 'center', marginTop: 8,

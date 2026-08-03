@@ -25,7 +25,7 @@ export default function RegisterScreen() {
 
   const validate = () => {
     if (!email || !password || !confirmPassword) {
-      Alert.alert('แจ้งเตือน', 'กรุณากรอกข้อมูลให้ครบทุกช่อง')
+      Alert.alert('แจ้งเตือน', 'กรุณากรอกข้อมูลให้ครบถ้วนทั้งหมด')
       return false
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -47,23 +47,19 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     if (!validate()) return
     setLoading(true)
-
     const { error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password: password,
     })
-
     setLoading(false)
-
     if (error) {
       if (error.message.includes('already registered')) {
-        Alert.alert('แจ้งเตือน', 'อีเมลนี้ถูกใช้ไปแล้ว')
+        Alert.alert('แจ้งเตือน', 'อีเมลนี้ถูกใช้แล้ว')
       } else {
         Alert.alert('สมัครไม่สำเร็จ', error.message)
       }
       return
     }
-
     router.push({
       pathname: '/(auth)/otp' as any,
       params: {
@@ -86,7 +82,6 @@ export default function RegisterScreen() {
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Text style={styles.backText}>← กลับ</Text>
           </TouchableOpacity>
-
           <Text style={styles.appName}>UNIWASH</Text>
           <Text style={styles.title}>สร้างบัญชีผู้ใช้</Text>
           <Text style={styles.desc}>กรอกข้อมูลเพื่อลงทะเบียนใช้บริการ</Text>
@@ -166,11 +161,10 @@ export default function RegisterScreen() {
 
           <TouchableOpacity style={styles.loginWrap} onPress={() => router.back()}>
             <Text style={styles.loginText}>
-              มีบัญชีอยู่แล้ว?{' '}
+              มีบัญชีอยู่แล้ว? {' '}
               <Text style={styles.loginLink}>เข้าสู่ระบบ</Text>
             </Text>
           </TouchableOpacity>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

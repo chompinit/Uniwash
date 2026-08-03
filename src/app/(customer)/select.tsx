@@ -1,6 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
+  ActivityIndicator,
+  Alert,
+  Image,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -8,46 +11,83 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
-
-const ITEMS = [
-  { type: 'shirt', label: 'เสื้อผ้า', desc: 'เช่น เสื้อยืด เสื้อเชิ้ต ครึ่งแขนหรือแขนยาว', price: 9, emoji: '👕' },
-  { type: 'pant', label: 'กางเกง', desc: 'เช่น กางเกงขาสั้น ขายาว ครึ่งตัวหรือเต็มตัว', price: 9, emoji: '👖' },
-  { type: 'underwear', label: 'ชุดชั้นใน', desc: 'เช่น ชุดชั้นในทุกชนิด', price: 3, emoji: '🩱' },
-  { type: 'bedsheet', label: 'ผ้าปูที่นอน', desc: 'เช่น ผ้าปูที่นอน ปลอกหมอน ผ้าห่ม', price: 20, emoji: '🛏️' },
-]
-
-const PRODUCTS = [
-  { id: 'p1', name: 'น้ำยาซักของร้าน', price: 10, emoji: '🧴', group: 'น้ำยาซักผ้า' },
-  { id: 'p2', name: 'Bleach', price: 10, emoji: '🫧', group: 'น้ำยาซักผ้า' },
-  { id: 'p3', name: 'Comfort', price: 15, emoji: '💧', group: 'น้ำยาปรับผ้านุ่ม' },
-]
-
-const GROUPS = ['น้ำยาซักผ้า', 'น้ำยาปรับผ้านุ่ม']
-
+import { supabase } from '../../../lib/supabase'
+type LaundryItem = {
+  id: string
+  name: string
+  image_url: string
+  price: number
+}
+type ClothingItem = {
+  id: string
+  name: string
+  image_url: string
+  price: number
+}
 export default function SelectScreen() {
   const { packageId } = useLocalSearchParams()
-  const [quantities, setQuantities] = useState<Record<string, number>>({
-    shirt: 0, pant: 0, underwear: 0, bedsheet: 0,
-  })
-  const [selectedProduct, setSelectedProduct] = useState('p1')
-
-  const changeQty = (type: string, delta: number) => {
+  const [laundryItems, setLaundryItems] = useState<LaundryItem[]>([])
+  const [clothingItems, setClothingItems] = useState<ClothingItem[]>([])
+  const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [selectedLaundry, setSelectedLaundry] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    fetchProducts()
+  }, [])
+  const fetchProducts = async () => {
+    try {
+      const [laundryRes, clothingRes] = await Promise.all([
+        supabase
+          .from('laundry_items')
+          .select('id, name, image_url, price')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('clothing_items')
+          .select('id, name, image_url, price')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
+      ])
+      if (laundryRes.error) throw laundryRes.error
+      if (clothingRes.error) throw clothingRes.error
+      setLaundryItems(laundryRes.data || [])
+      setClothingItems(clothingRes.data || [])
+      // Set default selections
+      if (laundryRes.data && laundryRes.data.length > 0) {
+        setSelectedLaundry(laundryRes.data[0].id)
+      }
+      // Initialize quantities
+      const initQties: Record<string, number> = {}
+      clothingRes.data?.forEach((item) => {
+        initQties[item.id] = 0
+      })
+      setQuantities(initQties)
+    } catch (error: any) {
+      Alert.alert('Error', error.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+  const changeQty = (id: string, delta: number) => {
     setQuantities(prev => ({
       ...prev,
-      [type]: Math.max(0, (prev[type] || 0) + delta),
+      [id]: Math.max(0, (prev[id] || 0) + delta),
     }))
   }
-
   const totalPrice =
-    ITEMS.reduce((sum, item) => sum + (quantities[item.type] || 0) * item.price, 0) +
-    (PRODUCTS.find(p => p.id === selectedProduct)?.price || 0)
-
+    clothingItems.reduce((sum, item) => sum + (quantities[item.id] || 0) * item.price, 0) +
+    (laundryItems.find(p => p.id === selectedLaundry)?.price || 0)
   const totalItems = Object.values(quantities).reduce((a, b) => a + b, 0)
-
+  if (loading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#1C8A99" />
+      </View>
+    )
+  }
   return (
     <SafeAreaView style={styles.container}>
-
-      {/* Header teal ตามม็อกอัป */}
+      {}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>‹</Text>
@@ -57,33 +97,36 @@ export default function SelectScreen() {
           <Text style={styles.deliverName}>Uniwash office ▾</Text>
         </View>
       </View>
-
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-
-        <Text style={styles.heading}>เลือกชนิดและจำนวนผ้าที่ต้องการ</Text>
-
-        {/* ชนิดผ้า — การ์ดคู่ตามม็อกอัป */}
-        <Text style={styles.sectionTitle}>ชนิดผ้า</Text>
+        <Text style={styles.heading}>เลือกเสื้อกางเกงและจำนวน</Text>
+        {}
+        <Text style={styles.sectionTitle}>เสื้อกางเกง</Text>
         <View style={styles.grid}>
-          {ITEMS.map(item => (
-            <View key={item.type} style={styles.typeCard}>
-              <View style={styles.typeImage}>
-                <Text style={{ fontSize: 44 }}>{item.emoji}</Text>
-              </View>
-              <Text style={styles.typeName}>{item.label}</Text>
-              <Text style={styles.typeDesc} numberOfLines={2}>{item.desc}</Text>
+          {clothingItems.map(item => (
+            <View key={item.id} style={styles.typeCard}>
+              {item.image_url ? (
+                <Image
+                  source={{ uri: item.image_url }}
+                  style={styles.typeImage}
+                />
+              ) : (
+                <View style={styles.typeImage}>
+                  <Text style={{ fontSize: 44 }}>👕</Text>
+                </View>
+              )}
+              <Text style={styles.typeName}>{item.name}</Text>
               <View style={styles.typeRow}>
                 <Text style={styles.typeRowLabel}>ราคา</Text>
-                <Text style={styles.typeRowValue}>{item.price} THB</Text>
+                <Text style={styles.typeRowValue}>฿{item.price}</Text>
               </View>
               <View style={styles.typeRow}>
                 <Text style={styles.typeRowLabel}>จำนวน</Text>
                 <View style={styles.qtyControl}>
-                  <TouchableOpacity onPress={() => changeQty(item.type, -1)} hitSlop={8}>
+                  <TouchableOpacity onPress={() => changeQty(item.id, -1)} hitSlop={8}>
                     <Text style={styles.qtyBtnText}>−</Text>
                   </TouchableOpacity>
-                  <Text style={styles.qtyNum}>{quantities[item.type] || 0}</Text>
-                  <TouchableOpacity onPress={() => changeQty(item.type, 1)} hitSlop={8}>
+                  <Text style={styles.qtyNum}>{quantities[item.id] || 0}</Text>
+                  <TouchableOpacity onPress={() => changeQty(item.id, 1)} hitSlop={8}>
                     <Text style={styles.qtyBtnText}>+</Text>
                   </TouchableOpacity>
                 </View>
@@ -91,54 +134,58 @@ export default function SelectScreen() {
             </View>
           ))}
         </View>
-
-        {/* ผลิตภัณฑ์ — แถวเลื่อนข้างตามม็อกอัป */}
-        <Text style={styles.heading}>เลือกผลิตภัณฑ์ที่ต้องการ</Text>
-        {GROUPS.map(group => (
-          <View key={group}>
-            <Text style={styles.sectionTitle}>{group}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-              {PRODUCTS.filter(p => p.group === group).map(prod => (
-                <TouchableOpacity
-                  key={prod.id}
-                  style={[styles.prodCard, selectedProduct === prod.id && styles.prodCardSelected]}
-                  onPress={() => setSelectedProduct(prod.id)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.prodImage}>
-                    <Text style={{ fontSize: 34 }}>{prod.emoji}</Text>
-                  </View>
-                  <Text style={styles.prodName} numberOfLines={1}>{prod.name}</Text>
-                  <View style={styles.typeRow}>
-                    <Text style={styles.typeRowLabel}>ราคา</Text>
-                    <Text style={styles.typeRowValue}>{prod.price} THB</Text>
-                  </View>
-                  {selectedProduct === prod.id && (
-                    <View style={styles.prodCheck}>
-                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        ))}
-
+        {}
+        <Text style={styles.heading}>เลือกน้ำยา</Text>
+        <Text style={styles.sectionTitle}>น้ำยาซักผ้า</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+          {laundryItems.map(prod => (
+            <TouchableOpacity
+              key={prod.id}
+              style={[styles.prodCard, selectedLaundry === prod.id && styles.prodCardSelected]}
+              onPress={() => setSelectedLaundry(prod.id)}
+              activeOpacity={0.85}
+            >
+              {prod.image_url ? (
+                <Image
+                  source={{ uri: prod.image_url }}
+                  style={styles.prodImage}
+                />
+              ) : (
+                <View style={styles.prodImage}>
+                  <Text style={{ fontSize: 34 }}>🧴</Text>
+                </View>
+              )}
+              <Text style={styles.prodName} numberOfLines={1}>{prod.name}</Text>
+              <View style={styles.typeRow}>
+                <Text style={styles.typeRowLabel}>ราคา</Text>
+                <Text style={styles.typeRowValue}>฿{prod.price}</Text>
+              </View>
+              {selectedLaundry === prod.id && (
+                <View style={styles.prodCheck}>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
         <View style={{ height: 16 }} />
       </ScrollView>
-
-      {/* Footer */}
+      {}
       <View style={styles.footer}>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>รวม:</Text>
+          <Text style={styles.priceValue}>฿{totalPrice}</Text>
+        </View>
         <TouchableOpacity
-          style={[styles.btnPrimary, totalItems === 0 && styles.btnDisabled]}
-          disabled={totalItems === 0}
+          style={[styles.btnPrimary, (totalItems === 0 || !selectedLaundry) && styles.btnDisabled]}
+          disabled={totalItems === 0 || !selectedLaundry}
           onPress={() =>
             router.push({
               pathname: '/(customer)/summary' as any,
               params: {
                 packageId,
                 quantities: JSON.stringify(quantities),
-                productId: selectedProduct,
+                laundryId: selectedLaundry,
                 totalPrice,
               },
             })
@@ -147,11 +194,9 @@ export default function SelectScreen() {
           <Text style={styles.btnText}>สรุปรายการ</Text>
         </TouchableOpacity>
       </View>
-
     </SafeAreaView>
   )
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: {
@@ -161,11 +206,9 @@ const styles = StyleSheet.create({
   backText: { fontSize: 26, color: '#fff', fontWeight: '600' },
   deliverTo: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.5 },
   deliverName: { fontSize: 13, fontWeight: '600', color: '#fff', marginTop: 1 },
-
   content: { flex: 1, paddingHorizontal: 16 },
   heading: { fontSize: 16, fontWeight: '700', color: '#1B1C2A', marginTop: 16, marginBottom: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: '#8A8F98', marginBottom: 10 },
-
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   typeCard: {
     width: '47.5%', backgroundColor: '#fff', borderRadius: 14,
@@ -186,7 +229,6 @@ const styles = StyleSheet.create({
   qtyControl: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   qtyBtnText: { fontSize: 17, color: '#1C8A99', fontWeight: '700' },
   qtyNum: { fontSize: 14, fontWeight: '700', color: '#1B1C2A', minWidth: 18, textAlign: 'center' },
-
   prodCard: {
     width: 120, backgroundColor: '#fff', borderRadius: 14,
     borderWidth: 1, borderColor: '#E6E8EB', padding: 10, marginRight: 10,
@@ -202,10 +244,24 @@ const styles = StyleSheet.create({
     width: 20, height: 20, borderRadius: 10, backgroundColor: '#1C8A99',
     alignItems: 'center', justifyContent: 'center',
   },
-
   footer: {
     padding: 16, backgroundColor: '#fff',
     borderTopWidth: 0.5, borderTopColor: '#E6E8EB',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  priceLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#8A8F98',
+  },
+  priceValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1C8A99',
   },
   btnPrimary: {
     backgroundColor: '#15707D', borderRadius: 16,
