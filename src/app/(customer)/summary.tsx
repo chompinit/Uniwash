@@ -20,12 +20,13 @@ import { pickPhoto, uploadOrderPhoto } from '../../../lib/uploadPhoto'
 type LaundryItem = { id: string; name: string; price: number }
 type ClothingItem = { id: string; name: string; price: number }
 export default function SummaryScreen() {
-  const { packageId, quantities, laundryId, totalPrice } = useLocalSearchParams()
+  const { packageId, quantities, laundryId, softenerId, totalPrice } = useLocalSearchParams()
   const parsedQty: Record<string, number> = quantities
     ? JSON.parse(quantities as string)
     : {}
   const [clothingItems, setClothingItems] = useState<Record<string, ClothingItem>>({})
   const [laundryItem, setLaundryItem] = useState<LaundryItem | null>(null)
+  const [softenerItem, setSoftenerItem] = useState<LaundryItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [address, setAddress] = useState('')
   const [noteText, setNoteText] = useState('')
@@ -51,7 +52,7 @@ export default function SummaryScreen() {
         })
         setClothingItems(clothingMap)
       }
-      // Get laundry item
+      // Get laundry item (น้ำยาซักผ้า)
       if (laundryId) {
         const { data: laundryData } = await supabase
           .from('laundry_items')
@@ -60,6 +61,17 @@ export default function SummaryScreen() {
           .single()
         if (laundryData) {
           setLaundryItem(laundryData)
+        }
+      }
+      // Get softener item (น้ำยาปรับผ้านุ่ม)
+      if (softenerId) {
+        const { data: softenerData } = await supabase
+          .from('laundry_items')
+          .select('id, name, price')
+          .eq('id', softenerId as string)
+          .single()
+        if (softenerData) {
+          setSoftenerItem(softenerData)
         }
       }
     } catch (error: any) {
@@ -117,6 +129,14 @@ export default function SummaryScreen() {
           order_id: orderData.id,
           item_type: 'laundry',
           item_id: laundryId as string,
+          quantity: 1,
+        })
+      }
+      if (softenerId) {
+        items.push({
+          order_id: orderData.id,
+          item_type: 'laundry',
+          item_id: softenerId as string,
           quantity: 1,
         })
       }
@@ -205,13 +225,21 @@ export default function SummaryScreen() {
           )}
         </View>
         {}
-        {laundryItem && (
+        {(laundryItem || softenerItem) && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>น้ำยา</Text>
-            <View style={styles.itemRow}>
-              <Text style={styles.itemName}>{laundryItem.name}</Text>
-              <Text style={styles.price}>฿{laundryItem.price}</Text>
-            </View>
+            {laundryItem && (
+              <View style={styles.itemRow}>
+                <Text style={styles.itemName}>น้ำยาซักผ้า: {laundryItem.name}</Text>
+                <Text style={styles.price}>฿{laundryItem.price}</Text>
+              </View>
+            )}
+            {softenerItem && (
+              <View style={styles.itemRow}>
+                <Text style={styles.itemName}>ปรับผ้านุ่ม: {softenerItem.name}</Text>
+                <Text style={styles.price}>฿{softenerItem.price}</Text>
+              </View>
+            )}
           </View>
         )}
         {}

@@ -35,7 +35,7 @@ export default function LaundryManagement() {
     name: '',
     description: '',
     price: '',
-    category: 'standard',
+    category: 'detergent',
     image_url: '',
   })
   const [uploading, setUploading] = useState(false)
@@ -220,7 +220,7 @@ export default function LaundryManagement() {
       name: '',
       description: '',
       price: '',
-      category: 'standard',
+      category: 'detergent',
       image_url: '',
     })
     setEditingId(null)
@@ -333,8 +333,8 @@ export default function LaundryManagement() {
             onChangeText={(text) => setForm({ ...form, price: text })}
           />
           <View style={styles.categoryContainer}>
-            <Text style={styles.label}>หมวดหมู่:</Text>
-            {['standard', 'premium', 'specialty'].map((cat) => (
+            <Text style={styles.label}>ประเภทผลิตภัณฑ์:</Text>
+            {['detergent', 'softener'].map((cat) => (
               <TouchableOpacity
                 key={cat}
                 style={[
@@ -349,7 +349,7 @@ export default function LaundryManagement() {
                     form.category === cat && styles.categoryButtonTextActive,
                   ]}
                 >
-                  {cat === 'standard' ? 'มาตรฐาน' : cat === 'premium' ? 'พรีเมี่ยม' : 'พิเศษ'}
+                  {cat === 'detergent' ? 'น้ำยาซักผ้า' : 'น้ำยาปรับผ้านุ่ม'}
                 </Text>
               </TouchableOpacity>
             ))}

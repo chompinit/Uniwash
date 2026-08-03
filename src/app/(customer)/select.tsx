@@ -17,6 +17,7 @@ type LaundryItem = {
   name: string
   image_url: string
   price: number
+  category: string
 }
 type ClothingItem = {
   id: string
@@ -29,8 +30,12 @@ export default function SelectScreen() {
   const [laundryItems, setLaundryItems] = useState<LaundryItem[]>([])
   const [clothingItems, setClothingItems] = useState<ClothingItem[]>([])
   const [quantities, setQuantities] = useState<Record<string, number>>({})
-  const [selectedLaundry, setSelectedLaundry] = useState<string>('')
+  const [selectedDetergent, setSelectedDetergent] = useState<string>('')
+  const [selectedSoftener, setSelectedSoftener] = useState<string>('')
   const [loading, setLoading] = useState(true)
+
+  const detergents = laundryItems.filter(l => l.category === 'detergent')
+  const softeners = laundryItems.filter(l => l.category === 'softener')
   useEffect(() => {
     fetchProducts()
   }, [])
@@ -41,7 +46,7 @@ export default function SelectScreen() {
       const [laundryRes, clothingRes] = await Promise.all([
         supabase
           .from('laundry_items')
-          .select('id, name, image_url, price')
+          .select('id, name, image_url, price, category')
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
         // โชว์เฉพาะผ้าที่ผูกกับแพ็กเกจที่เลือก
@@ -57,12 +62,14 @@ export default function SelectScreen() {
         .map((r: any) => (Array.isArray(r.clothing_items) ? r.clothing_items[0] : r.clothing_items))
         .filter((c: any) => c && c.is_active)
 
-      setLaundryItems(laundryRes.data || [])
+      const laundry = (laundryRes.data || []) as LaundryItem[]
+      setLaundryItems(laundry)
       setClothingItems(clothing)
-      // Set default selections
-      if (laundryRes.data && laundryRes.data.length > 0) {
-        setSelectedLaundry(laundryRes.data[0].id)
-      }
+      // Set default selections (เลือกตัวแรกของแต่ละประเภทให้อัตโนมัติ)
+      const firstDetergent = laundry.find(l => l.category === 'detergent')
+      const firstSoftener = laundry.find(l => l.category === 'softener')
+      if (firstDetergent) setSelectedDetergent(firstDetergent.id)
+      if (firstSoftener) setSelectedSoftener(firstSoftener.id)
       // Initialize quantities
       const initQties: Record<string, number> = {}
       clothing.forEach((item) => {
@@ -83,8 +90,43 @@ export default function SelectScreen() {
   }
   const totalPrice =
     clothingItems.reduce((sum, item) => sum + (quantities[item.id] || 0) * item.price, 0) +
-    (laundryItems.find(p => p.id === selectedLaundry)?.price || 0)
+    (laundryItems.find(p => p.id === selectedDetergent)?.price || 0) +
+    (laundryItems.find(p => p.id === selectedSoftener)?.price || 0)
   const totalItems = Object.values(quantities).reduce((a, b) => a + b, 0)
+
+  const renderLaundryRow = (list: LaundryItem[], selectedId: string, onSelect: (id: string) => void) => (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+      {list.length === 0 ? (
+        <Text style={styles.emptyClothing}>ยังไม่มีรายการ</Text>
+      ) : list.map(prod => (
+        <TouchableOpacity
+          key={prod.id}
+          style={[styles.prodCard, selectedId === prod.id && styles.prodCardSelected]}
+          onPress={() => onSelect(selectedId === prod.id ? '' : prod.id)}
+          activeOpacity={0.85}
+        >
+          {prod.image_url ? (
+            <Image source={{ uri: prod.image_url }} style={styles.prodImage} />
+          ) : (
+            <View style={styles.prodImage}>
+              <Text style={{ fontSize: 34 }}>🧴</Text>
+            </View>
+          )}
+          <Text style={styles.prodName} numberOfLines={1}>{prod.name}</Text>
+          <View style={styles.typeRow}>
+            <Text style={styles.typeRowLabel}>ราคา</Text>
+            <Text style={styles.typeRowValue}>฿{prod.price}</Text>
+          </View>
+          {selectedId === prod.id && (
+            <View style={styles.prodCheck}>
+              <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  )
+
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -108,76 +150,46 @@ export default function SelectScreen() {
         <Text style={styles.heading}>เลือกเสื้อกางเกงและจำนวน</Text>
         {}
         <Text style={styles.sectionTitle}>เสื้อกางเกง</Text>
-        {clothingItems.length === 0 && (
+        {clothingItems.length === 0 ? (
           <Text style={styles.emptyClothing}>ยังไม่มีชนิดผ้าในแพ็กเกจนี้</Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+            {clothingItems.map(item => (
+              <View key={item.id} style={styles.typeCard}>
+                {item.image_url ? (
+                  <Image source={{ uri: item.image_url }} style={styles.typeImage} />
+                ) : (
+                  <View style={styles.typeImage}>
+                    <Text style={{ fontSize: 44 }}>👕</Text>
+                  </View>
+                )}
+                <Text style={styles.typeName}>{item.name}</Text>
+                <View style={styles.typeRow}>
+                  <Text style={styles.typeRowLabel}>ราคา</Text>
+                  <Text style={styles.typeRowValue}>฿{item.price}</Text>
+                </View>
+                <View style={styles.typeRow}>
+                  <Text style={styles.typeRowLabel}>จำนวน</Text>
+                  <View style={styles.qtyControl}>
+                    <TouchableOpacity onPress={() => changeQty(item.id, -1)} hitSlop={8}>
+                      <Text style={styles.qtyBtnText}>−</Text>
+                    </TouchableOpacity>
+                    <Text style={styles.qtyNum}>{quantities[item.id] || 0}</Text>
+                    <TouchableOpacity onPress={() => changeQty(item.id, 1)} hitSlop={8}>
+                      <Text style={styles.qtyBtnText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         )}
-        <View style={styles.grid}>
-          {clothingItems.map(item => (
-            <View key={item.id} style={styles.typeCard}>
-              {item.image_url ? (
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.typeImage}
-                />
-              ) : (
-                <View style={styles.typeImage}>
-                  <Text style={{ fontSize: 44 }}>👕</Text>
-                </View>
-              )}
-              <Text style={styles.typeName}>{item.name}</Text>
-              <View style={styles.typeRow}>
-                <Text style={styles.typeRowLabel}>ราคา</Text>
-                <Text style={styles.typeRowValue}>฿{item.price}</Text>
-              </View>
-              <View style={styles.typeRow}>
-                <Text style={styles.typeRowLabel}>จำนวน</Text>
-                <View style={styles.qtyControl}>
-                  <TouchableOpacity onPress={() => changeQty(item.id, -1)} hitSlop={8}>
-                    <Text style={styles.qtyBtnText}>−</Text>
-                  </TouchableOpacity>
-                  <Text style={styles.qtyNum}>{quantities[item.id] || 0}</Text>
-                  <TouchableOpacity onPress={() => changeQty(item.id, 1)} hitSlop={8}>
-                    <Text style={styles.qtyBtnText}>+</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))}
-        </View>
         {}
         <Text style={styles.heading}>เลือกน้ำยา</Text>
         <Text style={styles.sectionTitle}>น้ำยาซักผ้า</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
-          {laundryItems.map(prod => (
-            <TouchableOpacity
-              key={prod.id}
-              style={[styles.prodCard, selectedLaundry === prod.id && styles.prodCardSelected]}
-              onPress={() => setSelectedLaundry(prod.id)}
-              activeOpacity={0.85}
-            >
-              {prod.image_url ? (
-                <Image
-                  source={{ uri: prod.image_url }}
-                  style={styles.prodImage}
-                />
-              ) : (
-                <View style={styles.prodImage}>
-                  <Text style={{ fontSize: 34 }}>🧴</Text>
-                </View>
-              )}
-              <Text style={styles.prodName} numberOfLines={1}>{prod.name}</Text>
-              <View style={styles.typeRow}>
-                <Text style={styles.typeRowLabel}>ราคา</Text>
-                <Text style={styles.typeRowValue}>฿{prod.price}</Text>
-              </View>
-              {selectedLaundry === prod.id && (
-                <View style={styles.prodCheck}>
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {renderLaundryRow(detergents, selectedDetergent, setSelectedDetergent)}
+        <Text style={styles.sectionTitle}>น้ำยาปรับผ้านุ่ม</Text>
+        {renderLaundryRow(softeners, selectedSoftener, setSelectedSoftener)}
         <View style={{ height: 16 }} />
       </ScrollView>
       {}
@@ -187,15 +199,16 @@ export default function SelectScreen() {
           <Text style={styles.priceValue}>฿{totalPrice}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.btnPrimary, (totalItems === 0 || !selectedLaundry) && styles.btnDisabled]}
-          disabled={totalItems === 0 || !selectedLaundry}
+          style={[styles.btnPrimary, (totalItems === 0 || !selectedDetergent) && styles.btnDisabled]}
+          disabled={totalItems === 0 || !selectedDetergent}
           onPress={() =>
             router.push({
               pathname: '/(customer)/summary' as any,
               params: {
                 packageId,
                 quantities: JSON.stringify(quantities),
-                laundryId: selectedLaundry,
+                laundryId: selectedDetergent,
+                softenerId: selectedSoftener,
                 totalPrice,
               },
             })
@@ -222,8 +235,8 @@ const styles = StyleSheet.create({
   emptyClothing: { fontSize: 13, color: '#8A8F98', textAlign: 'center', paddingVertical: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   typeCard: {
-    width: '47.5%', backgroundColor: '#fff', borderRadius: 14,
-    borderWidth: 1, borderColor: '#E6E8EB', padding: 12,
+    width: 150, backgroundColor: '#fff', borderRadius: 14,
+    borderWidth: 1, borderColor: '#E6E8EB', padding: 12, marginRight: 10,
   },
   typeImage: {
     height: 90, borderRadius: 10, backgroundColor: '#EEF1F4',
