@@ -29,10 +29,14 @@ type Pkg = {
   is_active: boolean
 }
 
+type ClothingOption = { id: string; name: string }
+
 const emptyForm = { name: '', description: '', min_items: '', max_items: '', delivery_km: '', is_active: true }
 
 export default function PackagesManagement() {
   const [packages, setPackages] = useState<Pkg[]>([])
+  const [allClothing, setAllClothing] = useState<ClothingOption[]>([])
+  const [linkedIds, setLinkedIds] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -43,12 +47,21 @@ export default function PackagesManagement() {
 
   const fetchPackages = async () => {
     try {
-      const { data, error } = await supabase
-        .from('packages')
-        .select('id, name, description, min_items, max_items, delivery_km, is_active')
-        .order('created_at', { ascending: true })
-      if (error) throw error
-      setPackages((data as Pkg[]) || [])
+      const [pkgRes, clothRes] = await Promise.all([
+        supabase
+          .from('packages')
+          .select('id, name, description, min_items, max_items, delivery_km, is_active')
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('clothing_items')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name', { ascending: true }),
+      ])
+      if (pkgRes.error) throw pkgRes.error
+      if (clothRes.error) throw clothRes.error
+      setPackages((pkgRes.data as Pkg[]) || [])
+      setAllClothing((clothRes.data as ClothingOption[]) || [])
     } catch (e: any) {
       Alert.alert('Error', e.message)
     } finally {
@@ -56,8 +69,8 @@ export default function PackagesManagement() {
     }
   }
 
-  const openNew = () => { setEditingId(null); setForm(emptyForm); setShowForm(true) }
-  const openEdit = (p: Pkg) => {
+  const openNew = () => { setEditingId(null); setForm(emptyForm); setLinkedIds([]); setShowForm(true) }
+  const openEdit = async (p: Pkg) => {
     setEditingId(p.id)
     setForm({
       name: p.name || '',
@@ -67,7 +80,17 @@ export default function PackagesManagement() {
       delivery_km: p.delivery_km != null ? String(p.delivery_km) : '',
       is_active: p.is_active,
     })
+    setLinkedIds([])
     setShowForm(true)
+    const { data } = await supabase
+      .from('package_clothing_items')
+      .select('clothing_item_id')
+      .eq('package_id', p.id)
+    setLinkedIds((data || []).map((r: any) => r.clothing_item_id))
+  }
+
+  const toggleClothing = (id: string) => {
+    setLinkedIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
   }
 
   const handleSave = async () => {
@@ -82,13 +105,26 @@ export default function PackagesManagement() {
       is_active: form.is_active,
     }
     try {
+      let pkgId = editingId
       if (editingId) {
         const { error } = await supabase.from('packages').update(payload).eq('id', editingId)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('packages').insert(payload)
+        const { data, error } = await supabase.from('packages').insert(payload).select('id').single()
         if (error) throw error
+        pkgId = data.id
       }
+
+      // sync รายการผ้าในแพ็กเกจ: ลบของเดิมทั้งหมดแล้วใส่ที่เลือกใหม่
+      if (pkgId) {
+        await supabase.from('package_clothing_items').delete().eq('package_id', pkgId)
+        if (linkedIds.length > 0) {
+          const rows = linkedIds.map((cid) => ({ package_id: pkgId, clothing_item_id: cid }))
+          const { error: linkErr } = await supabase.from('package_clothing_items').insert(rows)
+          if (linkErr) throw linkErr
+        }
+      }
+
       Alert.alert('สำเร็จ', editingId ? 'แก้ไขแพ็กเกจแล้ว' : 'เพิ่มแพ็กเกจแล้ว')
       setShowForm(false)
       fetchPackages()
@@ -191,6 +227,30 @@ export default function PackagesManagement() {
                 <Switch value={form.is_active} onValueChange={(v) => setForm({ ...form, is_active: v })}
                   trackColor={{ true: Brand.primary }} />
               </View>
+
+              <Text style={[styles.label, { marginTop: 16 }]}>
+                ชนิดผ้าในแพ็กเกจนี้ ({linkedIds.length} รายการ)
+              </Text>
+              <Text style={styles.hint}>ลูกค้าจะเห็นเฉพาะผ้าที่เลือกไว้ในแพ็กเกจนี้</Text>
+              {allClothing.length === 0 ? (
+                <Text style={styles.hint}>ยังไม่มีชนิดผ้า — เพิ่มได้ที่เมนู "จัดการเสื้อกางเกง"</Text>
+              ) : (
+                <View style={styles.clothingBox}>
+                  {allClothing.map((c) => {
+                    const on = linkedIds.includes(c.id)
+                    return (
+                      <TouchableOpacity key={c.id} style={styles.clothingRow}
+                        onPress={() => toggleClothing(c.id)} activeOpacity={0.7}>
+                        <View style={[styles.checkbox, on && styles.checkboxOn]}>
+                          {on ? <Text style={styles.checkmark}>✓</Text> : null}
+                        </View>
+                        <Text style={styles.clothingName}>{c.name}</Text>
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              )}
+
               <View style={styles.modalActions}>
                 <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowForm(false)} disabled={saving}>
                   <Text style={styles.cancelBtnText}>ยกเลิก</Text>
@@ -240,6 +300,13 @@ const styles = StyleSheet.create({
   input: { backgroundColor: Brand.inputBg, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: Brand.text, textAlignVertical: 'top' },
   row: { flexDirection: 'row', gap: 12 },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
+  hint: { fontSize: 12, color: Brand.textSecondary, marginBottom: 8 },
+  clothingBox: { borderWidth: 1, borderColor: Brand.border, borderRadius: 10, overflow: 'hidden' },
+  clothingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: Brand.border },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: Brand.border, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  checkboxOn: { backgroundColor: Brand.primary, borderColor: Brand.primary },
+  checkmark: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  clothingName: { fontSize: 14, color: Brand.text, flex: 1 },
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
   cancelBtn: { flex: 1, backgroundColor: Brand.inputBg, paddingVertical: 14, borderRadius: 10, alignItems: 'center' },
   cancelBtnText: { color: Brand.text, fontWeight: '700' },

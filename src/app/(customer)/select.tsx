@@ -36,29 +36,36 @@ export default function SelectScreen() {
   }, [])
   const fetchProducts = async () => {
     try {
+      const pkgId = Array.isArray(packageId) ? packageId[0] : packageId
+
       const [laundryRes, clothingRes] = await Promise.all([
         supabase
           .from('laundry_items')
           .select('id, name, image_url, price')
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
+        // โชว์เฉพาะผ้าที่ผูกกับแพ็กเกจที่เลือก
         supabase
-          .from('clothing_items')
-          .select('id, name, image_url, price')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false }),
+          .from('package_clothing_items')
+          .select('clothing_items (id, name, image_url, price, is_active)')
+          .eq('package_id', pkgId),
       ])
       if (laundryRes.error) throw laundryRes.error
       if (clothingRes.error) throw clothingRes.error
+
+      const clothing: ClothingItem[] = (clothingRes.data || [])
+        .map((r: any) => (Array.isArray(r.clothing_items) ? r.clothing_items[0] : r.clothing_items))
+        .filter((c: any) => c && c.is_active)
+
       setLaundryItems(laundryRes.data || [])
-      setClothingItems(clothingRes.data || [])
+      setClothingItems(clothing)
       // Set default selections
       if (laundryRes.data && laundryRes.data.length > 0) {
         setSelectedLaundry(laundryRes.data[0].id)
       }
       // Initialize quantities
       const initQties: Record<string, number> = {}
-      clothingRes.data?.forEach((item) => {
+      clothing.forEach((item) => {
         initQties[item.id] = 0
       })
       setQuantities(initQties)
@@ -101,6 +108,9 @@ export default function SelectScreen() {
         <Text style={styles.heading}>เลือกเสื้อกางเกงและจำนวน</Text>
         {}
         <Text style={styles.sectionTitle}>เสื้อกางเกง</Text>
+        {clothingItems.length === 0 && (
+          <Text style={styles.emptyClothing}>ยังไม่มีชนิดผ้าในแพ็กเกจนี้</Text>
+        )}
         <View style={styles.grid}>
           {clothingItems.map(item => (
             <View key={item.id} style={styles.typeCard}>
@@ -209,6 +219,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, paddingHorizontal: 16 },
   heading: { fontSize: 16, fontWeight: '700', color: '#1B1C2A', marginTop: 16, marginBottom: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: '#8A8F98', marginBottom: 10 },
+  emptyClothing: { fontSize: 13, color: '#8A8F98', textAlign: 'center', paddingVertical: 24 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   typeCard: {
     width: '47.5%', backgroundColor: '#fff', borderRadius: 14,
