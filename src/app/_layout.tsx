@@ -4,54 +4,116 @@ import { ActivityIndicator, View } from 'react-native'
 import { Brand } from '../constants/theme'
 import { supabase } from '../../lib/supabase'
 
-// ─────────────────────────────────────────────────────
-// แอปเดียว แยกสิทธิ์ตาม role ใน profiles.role
-//   admin     → (admin)
-//   employee  → (rider)      (พนักงานส่งผ้า)
-//   อื่น ๆ    → (customer)    (ลูกค้าทั่วไป / null / 'customer')
-// ─────────────────────────────────────────────────────
 function routeByRole(role?: string | null) {
-  if (role === 'admin') {
-    router.replace('/(admin)/dashboard' as any)
-  } else if (role === 'employee') {
-    router.replace('/(rider)/dashboard' as any)
-  } else {
-    router.replace('/(customer)/packages' as any)
+  try {
+    if (role === 'admin') {
+      router.replace('/(admin)/dashboard' as any)
+    } else if (role === 'employee') {
+      router.replace('/(employee)/dashboard' as any)
+    } else {
+      router.replace('/(customer)/packages' as any)
+    }
+  } catch (err) {
+    console.error('Navigation error:', err)
   }
 }
 
 export default function RootLayout() {
   const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          setLoading(false)
-          router.replace('/(auth)/login' as any)
-          return
-        }
+    let isMounted = true
 
-        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
-          if (!session) {
-            setLoading(false)
-            router.replace('/(auth)/login' as any)
-            return
+    const initAuth = async () => {
+      try {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          async (event, session) => {
+            if (!isMounted) return
+
+            try {
+              console.log('Auth event:', event)
+
+              if (event === 'SIGNED_OUT') {
+                setLoading(false)
+                setInitialized(true)
+                if (isMounted) {
+                  router.replace('/(auth)/login' as any)
+                }
+                return
+              }
+
+              if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
+                if (!session) {
+                  setLoading(false)
+                  setInitialized(true)
+                  if (isMounted) {
+                    router.replace('/(auth)/login' as any)
+                  }
+                  return
+                }
+
+                try {
+                  const { data, error } = await supabase
+                    .from('profiles')
+                    .select('role')
+                    .eq('id', session.user.id)
+                    .single()
+
+                  if (error) {
+                    console.error('Profile fetch error:', error)
+                    if (isMounted) {
+                      setLoading(false)
+                      setInitialized(true)
+                      routeByRole(null)
+                    }
+                    return
+                  }
+
+                  if (isMounted) {
+                    setLoading(false)
+                    setInitialized(true)
+                    routeByRole(data?.role)
+                  }
+                } catch (err) {
+                  console.error('Profile fetch exception:', err)
+                  if (isMounted) {
+                    setLoading(false)
+                    setInitialized(true)
+                    routeByRole(null)
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Auth state change error:', err)
+              if (isMounted) {
+                setLoading(false)
+                setInitialized(true)
+                router.replace('/(auth)/login' as any)
+              }
+            }
           }
+        )
 
-          const { data } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-
+        return () => {
+          isMounted = false
+          subscription.unsubscribe()
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err)
+        if (isMounted) {
           setLoading(false)
-          routeByRole(data?.role)
+          setInitialized(true)
+          router.replace('/(auth)/login' as any)
         }
       }
-    )
+    }
 
-    return () => subscription.unsubscribe()
+    initAuth()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
   if (loading) {

@@ -52,6 +52,7 @@ export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */
     sans: 'system-ui',
+    thai: 'Helvetica',
     /** iOS `UIFontDescriptorSystemDesignSerif` */
     serif: 'ui-serif',
     /** iOS `UIFontDescriptorSystemDesignRounded` */
@@ -61,12 +62,14 @@ export const Fonts = Platform.select({
   },
   default: {
     sans: 'normal',
+    thai: 'normal',
     serif: 'serif',
     rounded: 'normal',
     mono: 'monospace',
   },
   web: {
     sans: 'var(--font-display)',
+    thai: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
     serif: 'var(--font-serif)',
     rounded: 'var(--font-rounded)',
     mono: 'var(--font-mono)',
