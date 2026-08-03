@@ -71,7 +71,10 @@ export default function OTPScreen() {
     })
     setLoading(false)
     if (error) {
-      Alert.alert('OTP ไม่ถูกต้อง', 'กรุณาตรวจสอบ OTP หรือขอใหม่')
+      const msg = /expired/i.test(error.message)
+        ? 'รหัส OTP หมดอายุแล้ว กรุณากด "ส่งอีกครั้ง"'
+        : 'กรุณาตรวจสอบ OTP หรือขอใหม่'
+      Alert.alert('OTP ไม่ถูกต้อง', msg)
       setOtp(['', '', '', '', '', ''])
       inputRefs.current[0]?.focus()
       return
