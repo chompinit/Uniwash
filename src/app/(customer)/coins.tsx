@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   SafeAreaView,
   ScrollView,
@@ -48,6 +49,7 @@ export default function CoinsScreen() {
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollExpiry = useRef<ReturnType<typeof setTimeout> | null>(null)
   const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const linkIdRef = useRef('')
 
   useEffect(() => {
     fetchData()
@@ -99,23 +101,29 @@ export default function CoinsScreen() {
     setStep('loading_qr')
     setQrUrl('')
     setChargeId('')
+    linkIdRef.current = ''
     setPollCount(0)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) throw new Error('กรุณาเข้าสู่ระบบก่อน')
+      // สร้าง Omise Link (หน้าชำระเงินบนเว็บ)
       const res = await fetch(EDGE_FN_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ action: 'create', amount: selected }),
+        body: JSON.stringify({ action: 'create_link', amount: selected }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setChargeId(data.charge_id)
-      setQrUrl(data.qr_url ?? '')
-      setStep('show_qr')
+      if (!data.payment_uri) throw new Error('ไม่ได้รับลิงก์ชำระเงินจาก Omise')
+      linkIdRef.current = data.link_id
+      setChargeId(data.link_id)
+      // เปิดหน้าชำระเงิน Omise ในเบราว์เซอร์
+      await Linking.openURL(data.payment_uri)
+      // เริ่มตรวจสอบการชำระเงินอัตโนมัติ
+      startPolling()
     } catch (err: any) {
       setStep('idle')
       Alert.alert('เกิดข้อผิดพลาด', err.message)
@@ -150,7 +158,7 @@ export default function CoinsScreen() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ action: 'verify', charge_id: chargeId }),
+        body: JSON.stringify({ action: 'verify_link', link_id: linkIdRef.current }),
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
@@ -249,8 +257,8 @@ export default function CoinsScreen() {
               <Text style={{ fontSize: 22 }}>📱</Text>
             </View>
             <View>
-              <Text style={styles.payMethodName}>PromptPay QR Code</Text>
-              <Text style={styles.payMethodSub}>ผ่านแอปธนาคารของคุณ</Text>
+              <Text style={styles.payMethodName}>ชำระผ่านเว็บ Omise</Text>
+              <Text style={styles.payMethodSub}>บัตรเครดิต/เดบิต หรือ PromptPay</Text>
             </View>
             <View style={styles.payMethodCheck}>
               <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✓</Text>
@@ -301,8 +309,8 @@ export default function CoinsScreen() {
             {step === 'loading_qr' && (
               <View style={styles.modalCenter}>
                 <ActivityIndicator size="large" color="#1C8A99" />
-                <Text style={styles.modalLoadingText}>กำลังสร้าง QR Code...</Text>
-                <Text style={styles.modalSub}>กรุณารอสักครู่</Text>
+                <Text style={styles.modalLoadingText}>กำลังเปิดหน้าชำระเงิน...</Text>
+                <Text style={styles.modalSub}>กำลังพาไปยังเว็บ Omise</Text>
               </View>
             )}
 
@@ -363,7 +371,7 @@ export default function CoinsScreen() {
                   </Text>
                 </View>
                 <Text style={styles.pollNote}>
-                  หากสแกนและโอนเงินแล้ว รอบบจะยืนยันอัตโนมัติภายใน 10–30 วินาที
+                  ชำระเงินในเบราว์เซอร์ให้เสร็จแล้วกลับมาที่แอป ระบบจะยืนยันอัตโนมัติภายใน 10–30 วินาที
                 </Text>
                 <TouchableOpacity style={styles.btnCancelSmall} onPress={handleClose}>
                   <Text style={styles.btnCancelText}>ยกเลิกการรอ</Text>

@@ -169,6 +169,75 @@ serve(async (req) => {
     return json({ paid })
   }
 
+  // ────────────────────────────────────────────────────────────────────────
+  // ACTION: create_link — สร้าง Omise Link (หน้าชำระเงินบนเว็บ Omise)
+  // ────────────────────────────────────────────────────────────────────────
+  if (action === 'create_link') {
+    if (!amount || amount < 20 || amount > 150000) {
+      return json({ error: 'amount ต้องอยู่ระหว่าง 20–150,000 บาท' }, 400)
+    }
+    const linkRes = await fetch(`${OMISE_API}/links`, {
+      method: 'POST',
+      headers: { Authorization: omiseAuth, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        amount: String(amount * 100),
+        currency: 'thb',
+        title: `เติมเหรียญ Uniwash ${amount} Coins`,
+        description: `user:${user.id}`,
+        multiple: 'false',
+      }),
+    })
+    const link = await linkRes.json()
+    if (link.object === 'error') {
+      return json({ error: link.message }, 400)
+    }
+    await supabase.from('coin_transactions').insert({
+      user_id: user.id,
+      charge_id: link.id,
+      amount: amount,
+      type: 'topup',
+      status: 'pending',
+    })
+    return json({ link_id: link.id, payment_uri: link.payment_uri })
+  }
+
+  // ────────────────────────────────────────────────────────────────────────
+  // ACTION: verify_link — ตรวจว่ามี charge ที่ชำระสำเร็จใน link แล้วเครดิตเหรียญ
+  // ────────────────────────────────────────────────────────────────────────
+  if (action === 'verify_link') {
+    const linkId = body.link_id
+    if (!linkId) return json({ error: 'link_id required' }, 400)
+
+    const { data: txn } = await supabase
+      .from('coin_transactions')
+      .select('id, amount, status')
+      .eq('charge_id', linkId)
+      .eq('user_id', user.id)
+      .single()
+    if (!txn) return json({ error: 'Transaction not found' }, 404)
+    if (txn.status === 'success') return json({ paid: true })
+
+    const linkRes = await fetch(`${OMISE_API}/links/${linkId}`, {
+      headers: { Authorization: omiseAuth },
+    })
+    const link = await linkRes.json()
+    if (link.object === 'error') {
+      return json({ error: link.message }, 400)
+    }
+    const charges = link.charges?.data ?? []
+    const paid = charges.some((c: any) => c.paid === true && c.status === 'successful')
+
+    if (paid) {
+      const { error: rpcErr } = await supabase.rpc('add_coins_and_confirm', {
+        p_user_id: user.id,
+        p_charge_id: linkId,
+        p_amount: txn.amount,
+      })
+      if (rpcErr) return json({ error: rpcErr.message }, 500)
+    }
+    return json({ paid })
+  }
+
   return json({ error: 'invalid action' }, 400)
 })
  
