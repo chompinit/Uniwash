@@ -1,6 +1,6 @@
 import { router, Stack } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { ActivityIndicator, StyleSheet, View } from 'react-native'
 import { Brand } from '../constants/theme'
 import { supabase } from '../../lib/supabase'
 
@@ -116,13 +116,25 @@ export default function RootLayout() {
     }
   }, [])
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.card }}>
-        <ActivityIndicator size="large" color={Brand.primary} />
-      </View>
-    )
-  }
-
-  return <Stack screenOptions={{ headerShown: false }} />
+  // ต้อง mount navigator (<Stack>) เสมอ เพื่อให้ router.replace ทำงานได้
+  // (ถ้า return แค่ <View> ตอน loading จะไม่มี navigator → redirect หลุด → จอดำ)
+  // ระหว่างเช็ค session ให้ซ้อน loader ทับไว้กันเห็นหน้า login แว้บ
+  return (
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false }} />
+      {loading && (
+        <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+          <ActivityIndicator size="large" color={Brand.primary} />
+        </View>
+      )}
+    </View>
+  )
 }
+
+const styles = StyleSheet.create({
+  loadingOverlay: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Brand.card,
+  },
+})

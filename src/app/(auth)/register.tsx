@@ -16,6 +16,7 @@ import {
 import { supabase } from '../../../lib/supabase'
 
 export default function RegisterScreen() {
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -24,7 +25,7 @@ export default function RegisterScreen() {
   const [loading, setLoading] = useState(false)
 
   const validate = () => {
-    if (!email || !password || !confirmPassword) {
+    if (!fullName.trim() || !email || !password || !confirmPassword) {
       Alert.alert('แจ้งเตือน', 'กรุณากรอกข้อมูลให้ครบถ้วนทั้งหมด')
       return false
     }
@@ -47,12 +48,15 @@ export default function RegisterScreen() {
   const handleRegister = async () => {
     if (!validate()) return
     setLoading(true)
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim().toLowerCase(),
       password: password,
+      options: {
+        data: { full_name: fullName.trim() },
+      },
     })
-    setLoading(false)
     if (error) {
+      setLoading(false)
       if (error.message.includes('already registered')) {
         Alert.alert('แจ้งเตือน', 'อีเมลนี้ถูกใช้แล้ว')
       } else {
@@ -60,11 +64,26 @@ export default function RegisterScreen() {
       }
       return
     }
+
+    // ถ้าโปรเจกต์ปิด "ยืนยันอีเมล" signUp จะล็อกอินให้ทันที (มี session) และไม่ส่ง OTP
+    // → เขียนชื่อลง profiles แล้วปล่อยให้ _layout (SIGNED_IN) พาเข้าแอปเอง
+    if (data.session?.user) {
+      await supabase
+        .from('profiles')
+        .update({ full_name: fullName.trim() })
+        .eq('id', data.session.user.id)
+      setLoading(false)
+      return
+    }
+
+    // ถ้าเปิด "ยืนยันอีเมล" จะยังไม่มี session → ไปหน้ากรอก OTP
+    setLoading(false)
     router.push({
       pathname: '/(auth)/otp' as any,
       params: {
         email: email.trim().toLowerCase(),
         type: 'signup',
+        name: fullName.trim(),
       },
     })
   }
@@ -85,6 +104,16 @@ export default function RegisterScreen() {
           <Text style={styles.appName}>UNIWASH</Text>
           <Text style={styles.title}>สร้างบัญชีผู้ใช้</Text>
           <Text style={styles.desc}>กรอกข้อมูลเพื่อลงทะเบียนใช้บริการ</Text>
+
+          <Text style={styles.label}>ชื่อ-นามสกุล</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="เช่น สมชาย ใจดี"
+            placeholderTextColor="#B4B2A9"
+            value={fullName}
+            onChangeText={setFullName}
+            autoCapitalize="words"
+          />
 
           <Text style={styles.label}>อีเมล</Text>
           <TextInput

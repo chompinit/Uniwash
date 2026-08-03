@@ -13,9 +13,10 @@ import {
 import { supabase } from '../../../lib/supabase'
 
 export default function OTPScreen() {
-  const { email, type } = useLocalSearchParams<{
+  const { email, type, name } = useLocalSearchParams<{
     email: string
     type: 'signup' | 'recovery'
+    name?: string
   }>()
   const [otp, setOtp] = useState(['', '', '', '', '', ''])
   const [loading, setLoading] = useState(false)
@@ -64,13 +65,13 @@ export default function OTPScreen() {
       return
     }
     setLoading(true)
-    const { error } = await supabase.auth.verifyOtp({
+    const { data, error } = await supabase.auth.verifyOtp({
       email: email,
       token: code,
       type: type === 'signup' ? 'signup' : 'recovery',
     })
-    setLoading(false)
     if (error) {
+      setLoading(false)
       const msg = /expired/i.test(error.message)
         ? 'รหัส OTP หมดอายุแล้ว กรุณากด "ส่งอีกครั้ง"'
         : 'กรุณาตรวจสอบ OTP หรือขอใหม่'
@@ -80,6 +81,18 @@ export default function OTPScreen() {
       return
     }
     if (type === 'signup') {
+      // เขียนชื่อลงตาราง profiles หลังยืนยันตัวตนสำเร็จ (session พร้อมแล้ว)
+      const uid = data?.user?.id ?? data?.session?.user?.id
+      if (uid && name?.trim()) {
+        const { error: profileErr } = await supabase
+          .from('profiles')
+          .update({ full_name: name.trim() })
+          .eq('id', uid)
+        if (profileErr) {
+          console.warn('บันทึกชื่อลง profiles ไม่สำเร็จ:', profileErr.message)
+        }
+      }
+      setLoading(false)
       Alert.alert('สำเร็จ! 🎉', 'ยืนยันตัวตนเรียบร้อยแล้ว', [
         {
           text: 'เริ่มใช้งาน',
@@ -87,6 +100,7 @@ export default function OTPScreen() {
         },
       ])
     } else {
+      setLoading(false)
       router.replace('/(auth)/login' as any)
     }
   }
