@@ -19,6 +19,11 @@ import { supabase } from '../../../lib/supabase'
 import { pickPhoto, uploadOrderPhoto } from '../../../lib/uploadPhoto'
 type LaundryItem = { id: string; name: string; price: number }
 type ClothingItem = { id: string; name: string; price: number }
+type SavedAddress = { id: string; label: string; address: string; latitude: number | null; longitude: number | null }
+type CurrentLoc = { address: string; lat: number; lng: number }
+
+const LABEL_TH: Record<string, string> = { HOME: 'บ้าน', WORK: 'ที่ทำงาน' }
+
 export default function SummaryScreen() {
   const { packageId, quantities, laundryId, softenerId, totalPrice } = useLocalSearchParams()
   const parsedQty: Record<string, number> = quantities
@@ -28,7 +33,11 @@ export default function SummaryScreen() {
   const [laundryItem, setLaundryItem] = useState<LaundryItem | null>(null)
   const [softenerItem, setSoftenerItem] = useState<LaundryItem | null>(null)
   const [loading, setLoading] = useState(true)
-  const [address, setAddress] = useState('')
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddress[]>([])
+  const [selectedAddrId, setSelectedAddrId] = useState<string>('')
+  const [currentLoc, setCurrentLoc] = useState<CurrentLoc | null>(null)
+  const [locating, setLocating] = useState(false)
+  const [coins, setCoins] = useState(0)
   const [noteText, setNoteText] = useState('')
   const [photo, setPhoto] = useState<{ uri: string } | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -74,6 +83,19 @@ export default function SummaryScreen() {
           setSoftenerItem(softenerData)
         }
       }
+      // ที่อยู่จากโปรไฟล์ + ยอดเหรียญ
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const [addrRes, profRes] = await Promise.all([
+          supabase.from('addresses').select('id, label, address, latitude, longitude, is_default')
+            .eq('user_id', user.id).order('is_default', { ascending: false }),
+          supabase.from('profiles').select('coins').eq('id', user.id).single(),
+        ])
+        const addrs = (addrRes.data as (SavedAddress & { is_default: boolean })[]) || []
+        setSavedAddresses(addrs)
+        if (addrs.length > 0) setSelectedAddrId(addrs[0].id)
+        setCoins(profRes.data?.coins ?? 0)
+      }
     } catch (error: any) {
       Alert.alert('Error', error.message)
     } finally {
@@ -90,73 +112,128 @@ export default function SummaryScreen() {
       Alert.alert('Error', error.message)
     }
   }
-  const handleConfirmOrder = async () => {
-    if (!address.trim()) {
-      Alert.alert('Required', 'กรุณากรอกที่อยู่')
-      return
+
+  const useCurrentLocation = async () => {
+    setLocating(true)
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('ไม่ได้รับอนุญาต', 'กรุณาอนุญาตการเข้าถึงตำแหน่ง')
+        return
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High })
+      let addrText = `${loc.coords.latitude.toFixed(5)}, ${loc.coords.longitude.toFixed(5)}`
+      try {
+        const geo = await Location.reverseGeocodeAsync({
+          latitude: loc.coords.latitude, longitude: loc.coords.longitude,
+        })
+        const g = geo?.[0]
+        if (g) {
+          const parts = [g.name, g.street, (g as any).subdistrict ?? g.district, g.city, g.region].filter(Boolean)
+          if (parts.length) addrText = parts.join(' ')
+        }
+      } catch {}
+      setCurrentLoc({ address: addrText, lat: loc.coords.latitude, lng: loc.coords.longitude })
+      setSelectedAddrId('current')
+    } catch (e: any) {
+      Alert.alert('Error', 'ดึงตำแหน่งไม่สำเร็จ: ' + e.message)
+    } finally {
+      setLocating(false)
     }
+  }
+
+  const getDelivery = (): { address: string; lat: number | null; lng: number | null } | null => {
+    if (selectedAddrId === 'current') {
+      return currentLoc ? { address: currentLoc.address, lat: currentLoc.lat, lng: currentLoc.lng } : null
+    }
+    const a = savedAddresses.find(x => x.id === selectedAddrId)
+    return a ? { address: a.address, lat: a.latitude, lng: a.longitude } : null
+  }
+  // ตรวจก่อนเปิดหน้าชำระเงิน: ต้องมีรูป 1 รูป + ที่อยู่
+  const validateBeforePay = () => {
+    if (!photo) {
+      Alert.alert('ต้องมีรูปถ่าย', 'กรุณาถ่ายหรือเลือกรูปตะกร้าผ้า 1 รูปก่อนสั่งซื้อ')
+      return false
+    }
+    const d = getDelivery()
+    if (!d || !d.address.trim()) {
+      Alert.alert('ต้องมีที่อยู่', 'กรุณาเลือกที่อยู่จัดส่ง')
+      return false
+    }
+    return true
+  }
+
+  const handleConfirmOrder = async () => {
+    const d = getDelivery()
+    if (!photo || !d) { validateBeforePay(); return }
     try {
       setUploading(true)
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
-      // Upload photo will be handled after order is created
-      let photoUrl = ''
-      // Create order
+      const total = parseInt(totalPrice as string)
+
+      // ชำระด้วยเหรียญ → หักก่อนสร้างออเดอร์
+      if (paymentMethod === 'coins') {
+        if (coins < total) {
+          Alert.alert('เหรียญไม่พอ', `ต้องใช้ ${total} เหรียญ แต่มี ${coins}`)
+          setUploading(false)
+          return
+        }
+        const { data: paid, error: payErr } = await supabase.rpc('deduct_coins', { p_user_id: user.id, p_amount: total })
+        if (payErr || paid === false) {
+          Alert.alert('ชำระไม่สำเร็จ', payErr?.message ?? 'เหรียญไม่เพียงพอ')
+          setUploading(false)
+          return
+        }
+      }
+
+      const orderNumber = 'UW' + Date.now().toString().slice(-9)
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert([{
           customer_id: user.id,
           package_id: packageId,
-          total_price: parseInt(totalPrice as string),
+          order_number: orderNumber,
+          total_price: total,
           status: 'pending',
-          pickup_address: address,
-          notes: noteText,
+          delivery_address: d.address,
+          delivery_note: noteText || null,
+          delivery_lat: d.lat,
+          delivery_lng: d.lng,
+          paid_at: new Date().toISOString(),
         }])
         .select()
         .single()
       if (orderError) throw orderError
-      // Add order items
-      const items = Object.entries(parsedQty)
-        .filter(([_, qty]) => qty > 0)
+
+      // รายการ: เสื้อผ้า + น้ำยาซักผ้า + น้ำยาปรับผ้านุ่ม
+      const items: any[] = Object.entries(parsedQty)
+        .filter(([, qty]) => qty > 0)
         .map(([itemId, qty]) => ({
           order_id: orderData.id,
-          item_type: 'clothing',
-          item_id: itemId,
+          item_type: clothingItems[itemId]?.name ?? 'เสื้อผ้า',
           quantity: qty,
+          price_per_item: clothingItems[itemId]?.price ?? 0,
         }))
-      if (laundryId) {
-        items.push({
-          order_id: orderData.id,
-          item_type: 'laundry',
-          item_id: laundryId as string,
-          quantity: 1,
-        })
-      }
-      if (softenerId) {
-        items.push({
-          order_id: orderData.id,
-          item_type: 'laundry',
-          item_id: softenerId as string,
-          quantity: 1,
-        })
-      }
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(items)
+      if (laundryItem) items.push({ order_id: orderData.id, item_type: laundryItem.name, quantity: 1, price_per_item: laundryItem.price })
+      if (softenerItem) items.push({ order_id: orderData.id, item_type: softenerItem.name, quantity: 1, price_per_item: softenerItem.price })
+
+      const { error: itemsError } = await supabase.from('order_items').insert(items)
       if (itemsError) throw itemsError
-      // Upload delivery photo if exists
-      if (photo) {
-        try {
-          photoUrl = await uploadOrderPhoto(orderData.id, 'customer', photo.uri)
-        } catch (photoErr: any) {
-          console.error('Photo upload error:', photoErr)
-        }
+
+      // อัปโหลดรูปตะกร้าผ้า (บังคับ — ผ่าน validate แล้ว)
+      try {
+        await uploadOrderPhoto(orderData.id, 'customer', photo.uri)
+      } catch (photoErr: any) {
+        console.error('Photo upload error:', photoErr)
       }
-      Alert.alert('Success', 'ออเดอร์สำเร็จ', [
+
+      setModalVisible(false)
+      Alert.alert('สำเร็จ', 'สร้างออเดอร์เรียบร้อย', [
         {
           text: 'ดูรายละเอียด',
           onPress: () =>
-            router.push({
+            router.replace({
               pathname: '/(customer)/order-detail' as any,
               params: { orderId: orderData.id },
             }),
@@ -187,7 +264,7 @@ export default function SummaryScreen() {
         </View>
         {}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>รูปถ่ายตะกร้าผ้า</Text>
+          <Text style={styles.sectionTitle}>รูปถ่ายตะกร้าผ้า (จำเป็น)</Text>
           {photo ? (
             <View style={styles.photoContainer}>
               <Image source={{ uri: photo.uri }} style={styles.photo} />
@@ -244,14 +321,44 @@ export default function SummaryScreen() {
         )}
         {}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ที่อยู่ส่ง</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="ป้อนที่อยู่"
-            value={address}
-            onChangeText={setAddress}
-            multiline
-          />
+          <Text style={styles.sectionTitle}>ที่อยู่จัดส่ง</Text>
+          {savedAddresses.map(a => (
+            <TouchableOpacity
+              key={a.id}
+              style={[styles.addrOption, selectedAddrId === a.id && styles.addrOptionSel]}
+              onPress={() => setSelectedAddrId(a.id)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.radioOuter, selectedAddrId === a.id && styles.radioOuterSel]}>
+                {selectedAddrId === a.id && <View style={styles.radioDot} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.addrLabel}>{LABEL_TH[a.label] || a.label}</Text>
+                <Text style={styles.addrText}>{a.address}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+          {currentLoc && (
+            <TouchableOpacity
+              style={[styles.addrOption, selectedAddrId === 'current' && styles.addrOptionSel]}
+              onPress={() => setSelectedAddrId('current')}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.radioOuter, selectedAddrId === 'current' && styles.radioOuterSel]}>
+                {selectedAddrId === 'current' && <View style={styles.radioDot} />}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.addrLabel}>📍 ตำแหน่งปัจจุบัน</Text>
+                <Text style={styles.addrText}>{currentLoc.address}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.gpsBtn} onPress={useCurrentLocation} disabled={locating}>
+            <Text style={styles.gpsBtnText}>{locating ? 'กำลังดึงตำแหน่ง...' : '📍 ใช้ตำแหน่งปัจจุบัน'}</Text>
+          </TouchableOpacity>
+          {savedAddresses.length === 0 && !currentLoc && (
+            <Text style={styles.addrHint}>ยังไม่มีที่อยู่ที่บันทึกไว้ — เพิ่มที่หน้าโปรไฟล์ หรือกดใช้ตำแหน่งปัจจุบัน</Text>
+          )}
         </View>
         {}
         <View style={styles.section}>
@@ -274,7 +381,7 @@ export default function SummaryScreen() {
         {}
         <TouchableOpacity
           style={styles.confirmBtn}
-          onPress={() => setModalVisible(true)}
+          onPress={() => { if (validateBeforePay()) setModalVisible(true) }}
           disabled={uploading}
         >
           <Text style={styles.confirmBtnText}>
@@ -377,6 +484,26 @@ const styles = StyleSheet.create({
     minHeight: 80,
     fontSize: 13,
   },
+  addrOption: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: '#E6E8EB', borderRadius: 10,
+    padding: 12, marginBottom: 8,
+  },
+  addrOptionSel: { borderColor: '#1C8A99', backgroundColor: '#E3F1F3' },
+  radioOuter: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D5D8DC',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  radioOuterSel: { borderColor: '#1C8A99' },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#1C8A99' },
+  addrLabel: { fontSize: 14, fontWeight: '700', color: '#1B1C2A' },
+  addrText: { fontSize: 12, color: '#8A8F98', marginTop: 2 },
+  gpsBtn: {
+    backgroundColor: '#E3F1F3', borderRadius: 10, paddingVertical: 12,
+    alignItems: 'center', marginTop: 4,
+  },
+  gpsBtnText: { color: '#1C8A99', fontWeight: '700', fontSize: 13 },
+  addrHint: { fontSize: 12, color: '#8A8F98', marginTop: 8 },
   totalSection: { padding: 16, backgroundColor: '#f5f5f5' },
   totalRow: {
     flexDirection: 'row',

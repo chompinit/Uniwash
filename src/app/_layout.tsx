@@ -9,7 +9,7 @@ function routeByRole(role?: string | null) {
     if (role === 'admin') {
       router.replace('/(admin)/dashboard' as any)
     } else if (role === 'employee') {
-      router.replace('/(employee)/dashboard' as any)
+      router.replace('/(rider)/dashboard' as any)
     } else {
       router.replace('/(customer)/packages' as any)
     }
