@@ -84,13 +84,13 @@ export default function AdminLayout() {
           tabBarLabel: 'เสื้อกางเกง',
         }}
       />
-      <Tabs.Screen
-        name="riders"
-        options={{
-          title: 'พนักงาน',
-          tabBarLabel: 'พนักงาน',
-        }}
-      />
+      {/* หน้าย่อย — เข้าจากเมนูใน Dashboard ไม่แสดงเป็นแท็บ */}
+      <Tabs.Screen name="customers" options={{ href: null }} />
+      <Tabs.Screen name="employees" options={{ href: null }} />
+      <Tabs.Screen name="topups" options={{ href: null }} />
+      <Tabs.Screen name="packages" options={{ href: null }} />
+      <Tabs.Screen name="store" options={{ href: null }} />
+      <Tabs.Screen name="riders" options={{ href: null }} />
     </Tabs>
   )
 }

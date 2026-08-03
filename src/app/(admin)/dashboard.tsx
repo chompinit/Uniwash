@@ -154,32 +154,30 @@ export default function AdminDashboard() {
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>ดำเนินการด่วน</Text>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push('/(admin)/laundry' as any)}
-        >
-          <Text style={styles.actionButtonText}>จัดการน้ำยา</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push('/(admin)/clothing' as any)}
-        >
-          <Text style={styles.actionButtonText}>จัดการเสื้อกางเกง</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push('/(admin)/riders' as any)}
-        >
-          <Text style={styles.actionButtonText}>จัดการพนักงาน</Text>
-        </TouchableOpacity>
-
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>💡 เคล็ดลับ</Text>
-          <Text style={styles.infoText}>
-            คุณสามารถเพิ่ม อัปเดต และลบน้ำยา เสื้อกางเกง และพนักงานได้จากเมนูด่วนข้างบน
-          </Text>
-        </View>
+        <Text style={styles.sectionTitle}>การจัดการ</Text>
+        {[
+          { icon: '👥', label: 'จัดการลูกค้า', desc: 'ดู แก้ไข ลบลูกค้า', path: '/(admin)/customers' },
+          { icon: '🧑‍💼', label: 'จัดการพนักงาน', desc: 'ดู เพิ่ม ลบพนักงาน', path: '/(admin)/employees' },
+          { icon: '🪙', label: 'ยอด & ประวัติเติมเหรียญ', desc: 'ดูยอดและประวัติของลูกค้า', path: '/(admin)/topups' },
+          { icon: '📦', label: 'จัดการแพ็กเกจ', desc: 'ดู เพิ่ม แก้ไข ลบแพ็กเกจ', path: '/(admin)/packages' },
+          { icon: '🏪', label: 'ที่อยู่ร้าน', desc: 'แก้ไขรายละเอียดที่อยู่ร้าน', path: '/(admin)/store' },
+          { icon: '🧴', label: 'จัดการน้ำยา', desc: 'รายการน้ำยาซักผ้า', path: '/(admin)/laundry' },
+          { icon: '👕', label: 'จัดการเสื้อกางเกง', desc: 'รายการประเภทเสื้อผ้า', path: '/(admin)/clothing' },
+        ].map((m) => (
+          <TouchableOpacity
+            key={m.path}
+            style={styles.menuRow}
+            onPress={() => router.push(m.path as any)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuIcon}>{m.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.menuLabel}>{m.label}</Text>
+              <Text style={styles.menuDesc}>{m.desc}</Text>
+            </View>
+            <Text style={styles.menuArrow}>›</Text>
+          </TouchableOpacity>
+        ))}
       </ScrollView>
     </SafeAreaView>
   )
@@ -262,6 +260,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: Brand.border,
+  },
+  menuIcon: { fontSize: 24, marginRight: 14 },
+  menuLabel: { fontSize: 15, fontWeight: '700', color: Brand.text },
+  menuDesc: { fontSize: 12, color: Brand.textSecondary, marginTop: 2 },
+  menuArrow: { fontSize: 22, color: Brand.textSecondary, marginLeft: 8 },
   infoBox: {
     backgroundColor: '#e7f5ff',
     padding: 15,
