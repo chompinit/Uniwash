@@ -73,10 +73,10 @@ export default function AdminUsersScreen() {
           .map(r => ({
             text: r.label,
             onPress: async () => {
-              const { error } = await supabase
-                .from('profiles')
-                .update({ role: r.key })
-                .eq('id', user.id)
+              const { error } = await supabase.rpc('admin_set_role', {
+                p_user_id: user.id,
+                p_role: r.key,
+              })
               if (error) {
                 Alert.alert('เกิดข้อผิดพลาด', error.message)
               } else {
@@ -98,7 +98,11 @@ export default function AdminUsersScreen() {
         {
           text: '+ เพิ่ม 100 เหรียญ',
           onPress: async () => {
-            await supabase.rpc('add_coins', { p_user_id: user.id, p_amount: 100 })
+            const { error } = await supabase.rpc('admin_adjust_coins', {
+              p_user_id: user.id,
+              p_amount: 100,
+            })
+            if (error) Alert.alert('เกิดข้อผิดพลาด', error.message)
             fetchUsers()
           },
         },
@@ -106,7 +110,11 @@ export default function AdminUsersScreen() {
           text: '− ลด 100 เหรียญ',
           style: 'destructive',
           onPress: async () => {
-            await supabase.rpc('deduct_coins', { p_user_id: user.id, p_amount: 100 })
+            const { error } = await supabase.rpc('admin_adjust_coins', {
+              p_user_id: user.id,
+              p_amount: -100,
+            })
+            if (error) Alert.alert('เกิดข้อผิดพลาด', error.message)
             fetchUsers()
           },
         },

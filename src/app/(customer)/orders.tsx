@@ -1,13 +1,14 @@
 import { router } from 'expo-router'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-    ActivityIndicator,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
 
@@ -20,95 +21,94 @@ type Order = {
 }
 
 const STATUS_LABEL: Record<string, string> = {
-  pending: 'รอดำเนินการ',
-  washing: 'กำลังซัก',
-  delivered: 'จัดส่งแล้ว',
-}
-
-const STATUS_COLOR: Record<string, string> = {
-  pending: '#F59E0B',
-  washing: '#1D9E75',
-  delivered: '#888780',
+  pending: 'รอการรับผ้า',
+  washing: 'กำลังซักผ้า',
+  delivered: 'จัดส่งเรียบร้อยแล้ว',
+  cancelled: 'ยกเลิกแล้ว',
 }
 
 export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    fetchOrders()
-  }, [])
-
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
     const { data, error } = await supabase
       .from('orders')
-      .select('*')
+      .select('id, order_number, status, total_price, created_at')
       .eq('customer_id', user.id)
       .order('created_at', { ascending: false })
 
     if (!error) setOrders(data || [])
     setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    fetchOrders()
+  }, [fetchOrders])
+
+  const onRefresh = async () => {
+    setRefreshing(true)
+    await fetchOrders()
+    setRefreshing(false)
   }
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr)
-    return d.toLocaleDateString('th-TH', {
-      day: '2-digit', month: '2-digit', year: '2-digit',
-      hour: '2-digit', minute: '2-digit',
+  const formatDate = (dateStr: string) =>
+    new Date(dateStr).toLocaleDateString('th-TH', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
     })
-  }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← กลับ</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>ออเดอร์ของฉัน</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>สถานะรายการที่สั่งซื้อ</Text>
+        <Text style={styles.headerSub}>รายการที่สั่งซื้อ</Text>
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#1D9E75" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color="#1C8A99" style={{ marginTop: 40 }} />
       ) : orders.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🧺</Text>
           <Text style={styles.emptyText}>ยังไม่มีออเดอร์</Text>
         </View>
       ) : (
-        <ScrollView style={styles.content}>
+        <ScrollView
+          style={styles.content}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
           {orders.map(order => (
-            <TouchableOpacity
-              key={order.id}
-              style={styles.orderCard}
-              onPress={() => router.push({
-                pathname: '/(customer)/status' as any,
-                params: { orderId: order.id, orderNumber: order.order_number },
-              })}
-            >
-              <View style={styles.orderTop}>
-                <View style={styles.orderIcon}>
-                  <Text style={{ fontSize: 20 }}>👕</Text>
+            <View key={order.id}>
+              <Text style={styles.groupLabel}>{order.order_number}</Text>
+              <View style={styles.orderCard}>
+                <View style={styles.orderTop}>
+                  <Text style={styles.orderName}>ผ้าของ {order.order_number}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
+                    <Text style={styles.orderStatus}>
+                      {STATUS_LABEL[order.status] || order.status}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.orderNum}>#{order.order_number}</Text>
-                  <Text style={styles.orderDate}>{formatDate(order.created_at)}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: STATUS_COLOR[order.status] + '20' }]}>
-                  <Text style={[styles.statusText, { color: STATUS_COLOR[order.status] }]}>
-                    {STATUS_LABEL[order.status] || order.status}
-                  </Text>
+                <View style={styles.orderBottom}>
+                  <Text style={styles.priceValue}>{order.total_price} THB</Text>
+                  <TouchableOpacity
+                    style={styles.detailChip}
+                    onPress={() => router.push({
+                      pathname: '/(customer)/order-detail' as any,
+                      params: { orderId: order.id },
+                    })}
+                  >
+                    <Text style={styles.detailChipText}>ดูรายละเอียด</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.orderBottom}>
-                <Text style={styles.priceLabel}>ยอดรวม</Text>
-                <Text style={styles.priceValue}>{order.total_price} บาท</Text>
-              </View>
-            </TouchableOpacity>
+            </View>
           ))}
+          <View style={{ height: 24 }} />
         </ScrollView>
       )}
     </SafeAreaView>
@@ -116,39 +116,37 @@ export default function OrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  header: {
-    backgroundColor: '#fff', padding: 16,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderBottomWidth: 0.5, borderBottomColor: '#E0E0E0',
-  },
-  backText: { fontSize: 15, color: '#1D9E75' },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: '#2C2C2A' },
+  container: { flex: 1, backgroundColor: '#F3F5F7' },
+  header: { backgroundColor: '#fff', padding: 16 },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#1B1C2A' },
+  headerSub: { fontSize: 12, color: '#8A8F98', marginTop: 3 },
   content: { flex: 1, padding: 16 },
   emptyBox: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyEmoji: { fontSize: 60, marginBottom: 12 },
-  emptyText: { fontSize: 16, color: '#888780' },
+  emptyText: { fontSize: 16, color: '#8A8F98' },
+
+  groupLabel: { fontSize: 12, fontWeight: '700', color: '#8A8F98', marginBottom: 6 },
   orderCard: {
     backgroundColor: '#fff', borderRadius: 14,
-    padding: 16, marginBottom: 10,
-    borderWidth: 0.5, borderColor: '#E0E0E0',
+    padding: 14, marginBottom: 16,
+    shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
   },
-  orderTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  orderIcon: {
-    width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#E1F5EE',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  orderNum: { fontSize: 14, fontWeight: '600', color: '#2C2C2A' },
-  orderDate: { fontSize: 12, color: '#888780', marginTop: 2 },
-  statusBadge: {
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
-  },
-  statusText: { fontSize: 12, fontWeight: '600' },
-  orderBottom: {
+  orderTop: {
     flexDirection: 'row', justifyContent: 'space-between',
-    borderTopWidth: 0.5, borderTopColor: '#F0F0F0', paddingTop: 10,
+    marginBottom: 10, paddingBottom: 10,
+    borderBottomWidth: 1, borderBottomColor: '#16161F',
   },
-  priceLabel: { fontSize: 13, color: '#888780' },
-  priceValue: { fontSize: 14, fontWeight: '700', color: '#1D9E75' },
+  orderName: { fontSize: 14, fontWeight: '600', color: '#1B1C2A' },
+  orderDate: { fontSize: 12, color: '#1B1C2A', fontWeight: '500' },
+  orderStatus: { fontSize: 11, color: '#8A8F98', marginTop: 3 },
+  orderBottom: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+  },
+  priceValue: { fontSize: 14, fontWeight: '700', color: '#1B1C2A' },
+  detailChip: {
+    backgroundColor: '#CDE7EB', borderRadius: 16,
+    paddingHorizontal: 14, paddingVertical: 6,
+  },
+  detailChipText: { fontSize: 12, fontWeight: '600', color: '#15707D' },
 })

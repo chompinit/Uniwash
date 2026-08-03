@@ -215,7 +215,7 @@ export default function CoinsScreen() {
     })
 
   const txStatusStyle = (s: string) => {
-    if (s === 'success') return { label: 'สำเร็จ',    color: '#1D9E75' }
+    if (s === 'success') return { label: 'สำเร็จ',    color: '#1C8A99' }
     if (s === 'pending') return { label: 'รอยืนยัน', color: '#F59E0B' }
     return                      { label: 'ล้มเหลว',  color: '#E24B4A' }
   }
@@ -262,10 +262,10 @@ export default function CoinsScreen() {
               <Text style={[styles.coinOptAmount, selected === amount && styles.coinOptAmountSelected]}>
                 {amount}
               </Text>
-              <Text style={[styles.coinOptLabel, selected === amount && { color: '#1D9E75' }]}>
+              <Text style={[styles.coinOptLabel, selected === amount && { color: '#1C8A99' }]}>
                 Coins
               </Text>
-              <Text style={[styles.coinOptPrice, selected === amount && { color: '#1D9E75' }]}>
+              <Text style={[styles.coinOptPrice, selected === amount && { color: '#1C8A99' }]}>
                 ฿{amount}
               </Text>
             </TouchableOpacity>
@@ -349,7 +349,7 @@ export default function CoinsScreen() {
             {/* ── กำลังสร้าง QR ── */}
             {step === 'loading_qr' && (
               <View style={styles.modalCenter}>
-                <ActivityIndicator size="large" color="#1D9E75" />
+                <ActivityIndicator size="large" color="#1C8A99" />
                 <Text style={styles.modalLoadingText}>กำลังสร้าง QR Code...</Text>
                 <Text style={styles.modalSub}>กรุณารอสักครู่</Text>
               </View>
@@ -410,7 +410,7 @@ export default function CoinsScreen() {
             {/* ── กำลัง Polling ── */}
             {step === 'polling' && (
               <View style={styles.modalCenter}>
-                <ActivityIndicator size="large" color="#1D9E75" />
+                <ActivityIndicator size="large" color="#1C8A99" />
 
                 <Text style={styles.modalLoadingText}>กำลังตรวจสอบการชำระเงิน</Text>
                 <Text style={styles.pollSubText}>รอการยืนยันจาก Omise...</Text>
@@ -464,7 +464,7 @@ export default function CoinsScreen() {
                   <Text style={styles.btnText}>ปิด</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.btnCancelWrap} onPress={handleTopup}>
-                  <Text style={[styles.btnCancelText, { color: '#1D9E75' }]}>ลองใหม่อีกครั้ง</Text>
+                  <Text style={[styles.btnCancelText, { color: '#1C8A99' }]}>ลองใหม่อีกครั้ง</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -479,7 +479,7 @@ export default function CoinsScreen() {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#F3F5F7' },
 
   // Header
   header: {
@@ -487,16 +487,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     borderBottomWidth: 0.5, borderBottomColor: '#E0E0E0',
   },
-  backText: { fontSize: 15, color: '#1D9E75' },
+  backText: { fontSize: 15, color: '#1C8A99' },
   headerTitle: { fontSize: 17, fontWeight: '600', color: '#2C2C2A' },
-  refreshText: { fontSize: 20, color: '#1D9E75' },
+  refreshText: { fontSize: 20, color: '#1C8A99' },
   content: { flex: 1, padding: 16 },
 
   // Balance card
   balanceCard: {
-    backgroundColor: '#1D9E75', borderRadius: 18, padding: 24,
+    backgroundColor: '#1C8A99', borderRadius: 18, padding: 24,
     alignItems: 'center', marginBottom: 22,
-    shadowColor: '#1D9E75', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#1C8A99', shadowOpacity: 0.25, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
     elevation: 5,
   },
   balanceLabel: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginBottom: 8 },
@@ -510,10 +510,10 @@ const styles = StyleSheet.create({
     width: '30%', backgroundColor: '#fff', borderRadius: 14,
     borderWidth: 2, borderColor: '#E8E8E8', padding: 14, alignItems: 'center',
   },
-  coinOptSelected: { borderColor: '#1D9E75', backgroundColor: '#E1F5EE' },
+  coinOptSelected: { borderColor: '#1C8A99', backgroundColor: '#E3F1F3' },
   coinOptIcon: { fontSize: 22, marginBottom: 4 },
   coinOptAmount: { fontSize: 20, fontWeight: '800', color: '#2C2C2A' },
-  coinOptAmountSelected: { color: '#1D9E75' },
+  coinOptAmountSelected: { color: '#1C8A99' },
   coinOptLabel: { fontSize: 11, color: '#888780' },
   coinOptPrice: { fontSize: 12, color: '#888780', marginTop: 4, fontWeight: '500' },
 
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: 14, color: '#888780' },
   summaryValue: { fontSize: 14, fontWeight: '600', color: '#2C2C2A' },
-  summaryValueLarge: { fontSize: 22, fontWeight: '800', color: '#1D9E75' },
+  summaryValueLarge: { fontSize: 22, fontWeight: '800', color: '#1C8A99' },
 
   // Pay method
   payMethodBox: {
@@ -537,15 +537,15 @@ const styles = StyleSheet.create({
   payMethodRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   payMethodIcon: {
     width: 44, height: 44, borderRadius: 12,
-    backgroundColor: '#E1F5EE', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#E3F1F3', alignItems: 'center', justifyContent: 'center',
   },
   payMethodName: { fontSize: 14, fontWeight: '600', color: '#2C2C2A' },
   payMethodSub: { fontSize: 12, color: '#888780', marginTop: 2 },
   payMethodCheck: {
     marginLeft: 'auto', width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#1D9E75', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1C8A99', alignItems: 'center', justifyContent: 'center',
   },
-  secureNote: { fontSize: 11, color: '#1D9E75', fontWeight: '500', marginTop: 10, textAlign: 'center' },
+  secureNote: { fontSize: 11, color: '#1C8A99', fontWeight: '500', marginTop: 10, textAlign: 'center' },
 
   // History
   histCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 16 },
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 0.5, borderTopColor: '#E0E0E0',
   },
   btnPrimary: {
-    backgroundColor: '#1D9E75', borderRadius: 14,
+    backgroundColor: '#1C8A99', borderRadius: 14,
     paddingVertical: 16, alignItems: 'center',
   },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
   qrWrapper: { alignItems: 'center', marginBottom: 14 },
   qrImage: { width: 220, height: 220 },
   qrLabel: {
-    backgroundColor: '#1D9E75', paddingHorizontal: 20, paddingVertical: 6,
+    backgroundColor: '#1C8A99', paddingHorizontal: 20, paddingVertical: 6,
     borderRadius: 20, marginTop: 8,
   },
   qrLabelText: { color: '#fff', fontSize: 13, fontWeight: '700' },
@@ -606,19 +606,19 @@ const styles = StyleSheet.create({
 
   // Steps
   stepsBox: {
-    backgroundColor: '#F0FBF6', borderRadius: 12, padding: 14,
+    backgroundColor: '#E3F1F3', borderRadius: 12, padding: 14,
     width: '100%', marginBottom: 10,
   },
-  stepsTitle: { fontSize: 12, fontWeight: '700', color: '#1D9E75', marginBottom: 8 },
+  stepsTitle: { fontSize: 12, fontWeight: '700', color: '#1C8A99', marginBottom: 8 },
   stepRow: { fontSize: 13, color: '#2C2C2A', lineHeight: 22 },
 
   // Countdown
   countdownBox: {
-    backgroundColor: '#F0FBF6', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14,
+    backgroundColor: '#E3F1F3', borderRadius: 14, paddingHorizontal: 28, paddingVertical: 14,
     alignItems: 'center', marginTop: 16, marginBottom: 10,
   },
   countdownLabel: { fontSize: 12, color: '#888780', marginBottom: 4 },
-  countdownValue: { fontSize: 32, fontWeight: '800', color: '#1D9E75', letterSpacing: 2 },
+  countdownValue: { fontSize: 32, fontWeight: '800', color: '#1C8A99', letterSpacing: 2 },
   pollSubText: { fontSize: 13, color: '#888780', marginTop: 8 },
   pollNote: {
     fontSize: 12, color: '#888780', textAlign: 'center',
@@ -630,11 +630,11 @@ const styles = StyleSheet.create({
   successTitle: { fontSize: 22, fontWeight: '800', color: '#2C2C2A', marginBottom: 6 },
   successSub: { fontSize: 14, color: '#888780', marginBottom: 20 },
   newBalanceBox: {
-    backgroundColor: '#E1F5EE', borderRadius: 14, padding: 18,
+    backgroundColor: '#E3F1F3', borderRadius: 14, padding: 18,
     alignItems: 'center', width: '100%', marginBottom: 20,
   },
-  newBalanceLabel: { fontSize: 12, color: '#1D9E75', marginBottom: 4 },
-  newBalanceAmt: { fontSize: 28, fontWeight: '800', color: '#1D9E75' },
+  newBalanceLabel: { fontSize: 12, color: '#1C8A99', marginBottom: 4 },
+  newBalanceAmt: { fontSize: 28, fontWeight: '800', color: '#1C8A99' },
 
   // Failed
   failTitle: { fontSize: 20, fontWeight: '700', color: '#2C2C2A', marginBottom: 8 },
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
 
   // Buttons in modal
   btnConfirmPay: {
-    backgroundColor: '#1D9E75', borderRadius: 14,
+    backgroundColor: '#1C8A99', borderRadius: 14,
     paddingVertical: 14, alignItems: 'center', width: '100%', marginBottom: 8,
   },
   btnCancelWrap: { paddingVertical: 10, alignItems: 'center', width: '100%' },

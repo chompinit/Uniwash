@@ -162,16 +162,7 @@ serve(async (req) => {
       })
 
       if (rpcErr) {
-        // fallback: อัปเดตแยก (ยอมรับ race condition น้อยๆ ในระบบเล็ก)
-        await supabase
-          .from('profiles')
-          .update({ coins: supabase.rpc('coins + ' + txn.amount) })
-          .eq('id', user.id)
-
-        await supabase
-          .from('coin_transactions')
-          .update({ status: 'success', paid_at: new Date().toISOString() })
-          .eq('charge_id', charge_id)
+        return json({ error: rpcErr.message }, 500)
       }
     }
 

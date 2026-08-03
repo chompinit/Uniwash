@@ -24,10 +24,12 @@ type Package = {
 export default function PackagesScreen() {
   const [packages, setPackages] = useState<Package[]>([])
   const [selectedId, setSelectedId] = useState('')
+  const [name, setName] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     fetchPackages()
+    fetchProfile()
   }, [])
 
   const fetchPackages = async () => {
@@ -44,77 +46,74 @@ export default function PackagesScreen() {
     setLoading(false)
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.replace('/(auth)/login' as any)
+  const fetchProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single()
+    setName(data?.full_name ?? '')
   }
 
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Header */}
+      {/* Header: DELIVER TO ตามม็อกอัป */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>เลือกแพ็กเกจ</Text>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
-          <TouchableOpacity onPress={() => router.push('/(customer)/orders' as any)}>
-            <Text style={styles.navText}>ออเดอร์</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/(customer)/coins' as any)}>
-            <Text style={styles.navText}>🪙 เติมเงิน</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleLogout}>
-            <Text style={styles.logoutText}>ออก</Text>
-          </TouchableOpacity>
+        <View>
+          <Text style={styles.deliverTo}>DELIVER TO</Text>
+          <Text style={styles.deliverName}>Uniwash office ▾</Text>
         </View>
+        <TouchableOpacity
+          style={styles.avatar}
+          onPress={() => router.push('/(customer)/profile' as any)}
+        >
+          <Text style={{ fontSize: 18 }}>{name ? name.charAt(0) : '👤'}</Text>
+        </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#1D9E75" style={{ marginTop: 40 }} />
-      ) : (
-        <ScrollView style={styles.content}>
-          <Text style={styles.sectionLabel}>กรุณาเลือกแพ็กเกจ</Text>
+      {/* พื้น teal + การ์ดขาวตามม็อกอัป */}
+      <View style={styles.body}>
+        <Text style={styles.heading}>กรุณาเลือกแพ็กเก็จ</Text>
 
-          {packages.map((pkg) => (
+        {loading ? (
+          <ActivityIndicator size="large" color="#fff" style={{ marginTop: 40 }} />
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {packages.map((pkg) => (
+              <TouchableOpacity
+                key={pkg.id}
+                style={[styles.pkgCard, selectedId === pkg.id && styles.pkgCardSelected]}
+                onPress={() => setSelectedId(pkg.id)}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.pkgName}>{pkg.name}</Text>
+                <Text style={styles.pkgDesc}>{pkg.description}</Text>
+                <Text style={styles.pkgInfo}>
+                  จำนวน {pkg.min_items}–{pkg.max_items} ชิ้น · รัศมี {pkg.delivery_km} กม.
+                  {'\n'}สามารถเพิ่มจำนวนได้
+                </Text>
+              </TouchableOpacity>
+            ))}
+
             <TouchableOpacity
-              key={pkg.id}
-              style={[
-                styles.pkgCard,
-                selectedId === pkg.id && styles.pkgCardSelected,
-              ]}
-              onPress={() => setSelectedId(pkg.id)}
+              style={[styles.btnConfirm, !selectedId && styles.btnDisabled]}
+              disabled={!selectedId}
+              onPress={() =>
+                router.push({
+                  pathname: '/(customer)/select' as any,
+                  params: { packageId: selectedId },
+                })
+              }
             >
-              <View style={styles.pkgHeader}>
-                <Text style={styles.pkgName}>👕 {pkg.name}</Text>
-                {selectedId === pkg.id && (
-                  <View style={styles.checkCircle}>
-                    <Text style={{ color: 'white', fontWeight: '700' }}>✓</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.pkgDesc}>{pkg.description}</Text>
-              <Text style={styles.pkgInfo}>
-                จำนวน {pkg.min_items}–{pkg.max_items} ชิ้น
-                {'  ·  '}
-                รัศมี {pkg.delivery_km} กม.
-              </Text>
+              <Text style={styles.btnText}>ยืนยันแพ็กเก็จ</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
 
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.btnPrimary, !selectedId && styles.btnDisabled]}
-          disabled={!selectedId}
-          onPress={() =>
-            router.push({
-              pathname: '/(customer)/select' as any,
-              params: { packageId: selectedId },
-            })
-          }
-        >
-          <Text style={styles.btnText}>เลือกแพ็กเกจนี้ →</Text>
-        </TouchableOpacity>
+            <View style={{ height: 24 }} />
+          </ScrollView>
+        )}
       </View>
 
     </SafeAreaView>
@@ -122,60 +121,40 @@ export default function PackagesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    backgroundColor: '#fff',
-    padding: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#fff', paddingHorizontal: 20, paddingVertical: 14,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#2C2C2A' },
-  logoutText: { fontSize: 13, color: '#E24B4A' },
-  // 👇 เพิ่มโค้ดสไตล์จากรูปภาพตรงนี้ครับ
-  navText: { 
-    fontSize: 13, 
-    color: '#1D9E75', 
-    fontWeight: '500' 
-  },
-  content: { flex: 1, padding: 16 },
-  sectionLabel: { fontSize: 13, color: '#888780', marginBottom: 12 },
-  pkgCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'transparent',
-    padding: 16,
-    marginBottom: 12,
-  },
-  pkgCardSelected: {
-    borderColor: '#1D9E75',
-    backgroundColor: '#E1F5EE',
-  },
-  pkgHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  pkgName: { fontSize: 15, fontWeight: '600', color: '#2C2C2A' },
-  checkCircle: {
-    width: 22, height: 22, borderRadius: 11,
-    backgroundColor: '#1D9E75',
+  deliverTo: { fontSize: 11, fontWeight: '700', color: '#1C8A99', letterSpacing: 0.5 },
+  deliverName: { fontSize: 14, fontWeight: '600', color: '#2C2C2A', marginTop: 2 },
+  avatar: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: '#E3F1F3',
     alignItems: 'center', justifyContent: 'center',
   },
-  pkgDesc: { fontSize: 13, color: '#888780', marginBottom: 6 },
-  pkgInfo: { fontSize: 12, color: '#1D9E75', fontWeight: '500' },
-  footer: {
-    padding: 16, backgroundColor: '#fff',
-    borderTopWidth: 0.5, borderTopColor: '#E0E0E0',
+
+  body: {
+    flex: 1, backgroundColor: '#5FA8B3',
+    borderTopLeftRadius: 4, borderTopRightRadius: 4,
+    paddingHorizontal: 18, paddingTop: 16,
   },
-  btnPrimary: {
-    backgroundColor: '#1D9E75',
-    borderRadius: 12, paddingVertical: 15, alignItems: 'center',
+  heading: { fontSize: 20, fontWeight: '700', color: '#1B1C2A', marginBottom: 14 },
+
+  pkgCard: {
+    backgroundColor: '#fff', borderRadius: 22,
+    padding: 18, marginBottom: 14,
+    borderWidth: 2.5, borderColor: 'transparent',
   },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  pkgCardSelected: { borderColor: '#15707D', backgroundColor: '#E3F1F3' },
+  pkgName: { fontSize: 16, fontWeight: '800', color: '#1B1C2A', marginBottom: 8 },
+  pkgDesc: { fontSize: 13, color: '#8A8F98', lineHeight: 19, marginBottom: 6 },
+  pkgInfo: { fontSize: 12.5, color: '#8A8F98', lineHeight: 19 },
+
+  btnConfirm: {
+    backgroundColor: '#15707D', borderRadius: 16,
+    paddingVertical: 17, alignItems: 'center', marginTop: 8,
+  },
+  btnDisabled: { opacity: 0.5 },
+  btnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 })

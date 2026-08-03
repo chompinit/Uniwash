@@ -203,10 +203,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { flex: 1, padding: 24 },
   backBtn: { marginBottom: 20, marginTop: 8 },
-  backText: { fontSize: 15, color: '#1D9E75' },
+  backText: { fontSize: 15, color: '#1C8A99' },
   appName: {
     fontSize: 26, fontWeight: '700',
-    color: '#1D9E75', letterSpacing: 2,
+    color: '#1C8A99', letterSpacing: 2,
     textAlign: 'center', marginBottom: 12,
   },
   title: {
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   },
   emailText: {
     fontSize: 15, fontWeight: '600',
-    color: '#1D9E75', textAlign: 'center',
+    color: '#1C8A99', textAlign: 'center',
     marginTop: 4, marginBottom: 36,
   },
   otpRow: {
@@ -239,14 +239,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   otpBoxFilled: {
-    borderColor: '#1D9E75',
-    backgroundColor: '#E1F5EE',
+    borderColor: '#1C8A99',
+    backgroundColor: '#E3F1F3',
   },
   otpBoxComplete: {
-    borderColor: '#1D9E75',
+    borderColor: '#1C8A99',
   },
   btnPrimary: {
-    backgroundColor: '#1D9E75',
+    backgroundColor: '#1C8A99',
     borderRadius: 12,
     paddingVertical: 15,
     alignItems: 'center',
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   resendLabel: { fontSize: 13, color: '#888780' },
-  resendLink: { fontSize: 13, color: '#1D9E75', fontWeight: '600' },
+  resendLink: { fontSize: 13, color: '#1C8A99', fontWeight: '600' },
   countdown: { fontSize: 13, color: '#E24B4A' },
   tipBox: {
     marginTop: 24,

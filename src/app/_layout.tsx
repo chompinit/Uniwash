@@ -1,7 +1,24 @@
 import { router, Stack } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, View } from 'react-native'
+import { Brand } from '../constants/theme'
 import { supabase } from '../../lib/supabase'
+
+// ─────────────────────────────────────────────────────
+// แอปเดียว แยกสิทธิ์ตาม role ใน profiles.role
+//   admin     → (admin)
+//   employee  → (rider)      (พนักงานส่งผ้า)
+//   อื่น ๆ    → (customer)    (ลูกค้าทั่วไป / null / 'customer')
+// ─────────────────────────────────────────────────────
+function routeByRole(role?: string | null) {
+  if (role === 'admin') {
+    router.replace('/(admin)/dashboard' as any)
+  } else if (role === 'employee') {
+    router.replace('/(rider)/dashboard' as any)
+  } else {
+    router.replace('/(customer)/packages' as any)
+  }
+}
 
 export default function RootLayout() {
   const [loading, setLoading] = useState(true)
@@ -15,7 +32,7 @@ export default function RootLayout() {
           return
         }
 
-        if (event === 'INITIAL_SESSION') {
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN') {
           if (!session) {
             setLoading(false)
             router.replace('/(auth)/login' as any)
@@ -29,16 +46,8 @@ export default function RootLayout() {
             .single()
 
           setLoading(false)
-
-          // Customer app — ถ้าเป็น admin หรือ employee ให้ออก
-          if (data?.role === 'admin' || data?.role === 'employee') {
-            await supabase.auth.signOut()
-            router.replace('/(auth)/login' as any)
-          } else {
-            router.replace('/(customer)/packages' as any)
-          }
+          routeByRole(data?.role)
         }
-
       }
     )
 
@@ -47,8 +56,8 @@ export default function RootLayout() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#1D9E75" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Brand.card }}>
+        <ActivityIndicator size="large" color={Brand.primary} />
       </View>
     )
   }

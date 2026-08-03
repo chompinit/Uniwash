@@ -1,14 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
 import {
-    ActivityIndicator,
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
 
@@ -33,9 +33,9 @@ const ITEM_LABELS: Record<string, string> = {
 }
 
 const STEPS = [
-  { key: 'pending', label: 'ชำระเงินเรียบร้อย', sub: 'สำเร็จแล้ว' },
-  { key: 'washing', label: 'กำลังดำเนินการซัก', sub: 'กำลังดำเนินการ...' },
-  { key: 'delivered', label: 'จัดส่งกลับเรียบร้อย', sub: 'เสร็จสิ้น' },
+  { key: 'pending', label: 'ชำระเงินเรียบร้อยแล้ว' },
+  { key: 'washing', label: 'กำลังซักผ้า' },
+  { key: 'delivered', label: 'จัดส่งผ้าเรียบร้อยแล้ว' },
 ]
 
 const STATUS_ORDER = ['pending', 'washing', 'delivered']
@@ -69,10 +69,14 @@ export default function StatusScreen() {
       {
         text: 'ยกเลิก', style: 'destructive',
         onPress: async () => {
-          await supabase
-            .from('orders')
-            .update({ status: 'cancelled' })
-            .eq('id', orderId)
+          // ใช้ RPC เพื่อคืนเหรียญที่จ่ายไปแล้วด้วย
+          const { error } = await supabase.rpc('cancel_order_refund', {
+            p_order_id: orderId,
+          })
+          if (error) {
+            Alert.alert('ยกเลิกไม่สำเร็จ', error.message)
+            return
+          }
           router.replace('/(customer)/packages' as any)
         },
       },
@@ -84,7 +88,7 @@ export default function StatusScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ActivityIndicator size="large" color="#1D9E75" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color="#1C8A99" style={{ marginTop: 40 }} />
       </SafeAreaView>
     )
   }
@@ -92,96 +96,69 @@ export default function StatusScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>ติดตามออเดอร์</Text>
-        <TouchableOpacity onPress={() => router.push('/(customer)/orders' as any)}>
-          <Text style={styles.allOrderText}>ดูทั้งหมด</Text>
+        <TouchableOpacity style={styles.backChip} onPress={() => router.back()}>
+          <Text style={styles.backChipText}>‹</Text>
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>ติดตามสถานะ</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView style={styles.content}>
 
-        {}
-        <View style={styles.card}>
-          <Text style={styles.orderNum}>ออเดอร์ #{order?.order_number || orderNumber}</Text>
+        {/* หัวออเดอร์ตามม็อกอัป */}
+        <View style={styles.orderHead}>
+          <Text style={styles.orderNum}>ผ้าของ #{order?.order_number || orderNumber}</Text>
           <Text style={styles.orderDate}>
+            Orderd. At{' '}
             {order?.created_at
               ? new Date(order.created_at).toLocaleDateString('th-TH', {
-                  day: '2-digit', month: 'long', year: 'numeric',
+                  day: '2-digit', month: '2-digit', year: '2-digit',
                   hour: '2-digit', minute: '2-digit',
                 })
-              : ''}
+              : ''}{' '}น.
           </Text>
+          {order?.order_items?.map((item, i) => (
+            <Text key={i} style={styles.orderItem}>
+              {item.quantity}x {ITEM_LABELS[item.item_type] || item.item_type}
+            </Text>
+          ))}
         </View>
 
-        {}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>STATUS</Text>
-          {STEPS.map((step, index) => {
-            const isDone = index < currentStepIndex
-            const isActive = index === currentStepIndex
-            const isPending = index > currentStepIndex
+        {/* STATUS watermark + timeline จุดส้ม */}
+        <View style={styles.statusZone}>
+          <Text style={styles.watermark}>STATUS</Text>
 
-            return (
-              <View key={step.key}>
-                <View style={styles.stepItem}>
-                  <View style={[
-                    styles.dot,
-                    isDone && styles.dotDone,
-                    isActive && styles.dotActive,
-                    isPending && styles.dotPending,
-                  ]} />
-                  <View>
-                    <Text style={[
-                      styles.stepTitle,
-                      isActive && { color: '#1D9E75' },
-                      isPending && { opacity: 0.4 },
-                    ]}>
+          <View style={styles.timeline}>
+            {STEPS.map((step, index) => {
+              const isDone = index < currentStepIndex
+              const isActive = index === currentStepIndex
+              const reached = isDone || isActive
+
+              return (
+                <View key={step.key}>
+                  <View style={styles.stepItem}>
+                    <View style={[styles.dot, reached ? styles.dotActive : styles.dotPending]} />
+                    <Text style={[styles.stepTitle, !reached && styles.stepTitleDim]}>
                       {step.label}
                     </Text>
-                    <Text style={[styles.stepSub, isPending && { opacity: 0.4 }]}>
-                      {step.sub}
-                    </Text>
                   </View>
+                  {index < STEPS.length - 1 && (
+                    <View style={[styles.stepLine, isDone && styles.stepLineDone]} />
+                  )}
                 </View>
-                {index < STEPS.length - 1 && (
-                  <View style={[styles.stepLine, isDone && styles.stepLineDone]} />
-                )}
-              </View>
-            )
-          })}
-        </View>
-
-        {}
-        {order?.order_items && order.order_items.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>รายการ</Text>
-            {order.order_items.map((item, i) => (
-              <View key={i} style={styles.itemRow}>
-                <Text style={styles.itemLabel}>
-                  {ITEM_LABELS[item.item_type] || item.item_type}
-                </Text>
-                <Text style={styles.itemQty}>{item.quantity} ชิ้น</Text>
-                <Text style={styles.itemPrice}>
-                  {item.quantity * item.price_per_item} บาท
-                </Text>
-              </View>
-            ))}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>รวม</Text>
-              <Text style={styles.totalPrice}>{order.total_price} บาท</Text>
-            </View>
+              )
+            })}
           </View>
-        )}
+        </View>
 
       </ScrollView>
 
-      {}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.btnHome}
           onPress={() => router.replace('/(customer)/packages' as any)}
         >
-          <Text style={styles.btnHomeText}>กลับหน้าหลัก</Text>
+          <Text style={styles.btnHomeText}>กลับสู่หน้าหลัก</Text>
         </TouchableOpacity>
 
         {order?.status === 'pending' && (
@@ -195,50 +172,52 @@ export default function StatusScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    backgroundColor: '#fff', padding: 16,
+    backgroundColor: '#fff', padding: 14,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderBottomWidth: 0.5, borderBottomColor: '#E0E0E0',
+    borderBottomWidth: 0.5, borderBottomColor: '#E6E8EB',
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#2C2C2A' },
-  allOrderText: { fontSize: 13, color: '#1D9E75' },
-  content: { flex: 1, padding: 16 },
-  card: {
-    backgroundColor: '#fff', borderRadius: 14,
-    padding: 16, marginBottom: 12,
+  backChip: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#EEF1F4',
+    alignItems: 'center', justifyContent: 'center',
   },
-  cardTitle: { fontSize: 12, fontWeight: '600', color: '#888780', marginBottom: 14, textAlign: 'center' },
-  orderNum: { fontSize: 16, fontWeight: '700', color: '#2C2C2A' },
-  orderDate: { fontSize: 12, color: '#888780', marginTop: 4 },
-  stepItem: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, marginBottom: 4 },
-  dot: { width: 14, height: 14, borderRadius: 7, marginTop: 2, flexShrink: 0 },
-  dotDone: { backgroundColor: '#1D9E75' },
-  dotActive: { backgroundColor: '#1D9E75', shadowColor: '#1D9E75', shadowRadius: 6, shadowOpacity: 0.5, elevation: 4 },
-  dotPending: { backgroundColor: '#E0E0E0' },
-  stepLine: { width: 2, height: 24, backgroundColor: '#E0E0E0', marginLeft: 6, marginVertical: 2 },
-  stepLineDone: { backgroundColor: '#1D9E75' },
-  stepTitle: { fontSize: 14, fontWeight: '600', color: '#2C2C2A' },
-  stepSub: { fontSize: 12, color: '#888780', marginTop: 2 },
-  itemRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0',
+  backChipText: { fontSize: 22, color: '#1B1C2A', fontWeight: '600', marginTop: -2 },
+  headerTitle: { fontSize: 16, fontWeight: '600', color: '#1B1C2A' },
+  content: { flex: 1, padding: 20 },
+
+  orderHead: { marginBottom: 8 },
+  orderNum: { fontSize: 15, fontWeight: '700', color: '#1B1C2A' },
+  orderDate: { fontSize: 12, color: '#8A8F98', marginTop: 3, marginBottom: 6 },
+  orderItem: { fontSize: 12, color: '#8A8F98', lineHeight: 18 },
+
+  statusZone: { paddingTop: 10 },
+  watermark: {
+    fontSize: 44, fontWeight: '800', color: '#E6E8EB',
+    letterSpacing: 6, textAlign: 'center', marginVertical: 24,
   },
-  itemLabel: { flex: 1, fontSize: 13, color: '#2C2C2A' },
-  itemQty: { fontSize: 13, color: '#888780', marginRight: 16 },
-  itemPrice: { fontSize: 13, fontWeight: '500', color: '#2C2C2A' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10 },
-  totalLabel: { fontSize: 14, fontWeight: '600', color: '#2C2C2A' },
-  totalPrice: { fontSize: 16, fontWeight: '700', color: '#1D9E75' },
-  footer: { padding: 16, backgroundColor: '#fff', borderTopWidth: 0.5, borderTopColor: '#E0E0E0', gap: 8 },
+  timeline: { paddingLeft: 28 },
+  stepItem: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  dot: { width: 18, height: 18, borderRadius: 9 },
+  dotActive: { backgroundColor: '#F08A24' },
+  dotPending: { backgroundColor: '#E6E8EB' },
+  stepLine: {
+    width: 3, height: 38, backgroundColor: '#E6E8EB',
+    marginLeft: 7.5, marginVertical: 3,
+  },
+  stepLineDone: { backgroundColor: '#F08A24' },
+  stepTitle: { fontSize: 14, fontWeight: '600', color: '#1B1C2A' },
+  stepTitleDim: { color: '#B4B2A9' },
+
+  footer: { padding: 16, gap: 8 },
   btnHome: {
-    backgroundColor: '#1D9E75', borderRadius: 12,
-    paddingVertical: 14, alignItems: 'center',
+    backgroundColor: '#16161F', borderRadius: 12,
+    paddingVertical: 15, alignItems: 'center',
   },
   btnHomeText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   btnCancel: {
     backgroundColor: 'transparent', borderRadius: 12, borderWidth: 1.5,
-    borderColor: '#E24B4A', paddingVertical: 12, alignItems: 'center',
+    borderColor: '#E2574C', paddingVertical: 12, alignItems: 'center',
   },
-  btnCancelText: { color: '#E24B4A', fontSize: 14, fontWeight: '600' },
+  btnCancelText: { color: '#E2574C', fontSize: 14, fontWeight: '600' },
 })

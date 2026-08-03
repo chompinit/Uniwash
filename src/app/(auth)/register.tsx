@@ -142,7 +142,7 @@ export default function RegisterScreen() {
           {confirmPassword.length > 0 && (
             <Text style={{
               fontSize: 12,
-              color: password === confirmPassword ? '#1D9E75' : '#E24B4A',
+              color: password === confirmPassword ? '#1C8A99' : '#E24B4A',
               marginTop: -10,
               marginBottom: 12,
             }}>
@@ -181,10 +181,10 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   content: { padding: 24, paddingBottom: 40 },
   backBtn: { marginBottom: 20, marginTop: 8 },
-  backText: { fontSize: 15, color: '#1D9E75' },
+  backText: { fontSize: 15, color: '#1C8A99' },
   appName: {
     fontSize: 26, fontWeight: '700',
-    color: '#1D9E75', letterSpacing: 2,
+    color: '#1C8A99', letterSpacing: 2,
     textAlign: 'center', marginBottom: 8,
   },
   title: {
@@ -207,12 +207,12 @@ const styles = StyleSheet.create({
   inputFlex: { flex: 1, marginBottom: 0 },
   eyeBtn: { paddingHorizontal: 12, paddingVertical: 10 },
   btnPrimary: {
-    backgroundColor: '#1D9E75', borderRadius: 12,
+    backgroundColor: '#1C8A99', borderRadius: 12,
     paddingVertical: 15, alignItems: 'center', marginTop: 8,
   },
   btnDisabled: { opacity: 0.6 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   loginWrap: { marginTop: 18, alignItems: 'center' },
   loginText: { fontSize: 13, color: '#888780' },
-  loginLink: { color: '#1D9E75', fontWeight: '600' },
+  loginLink: { color: '#1C8A99', fontWeight: '600' },
 })

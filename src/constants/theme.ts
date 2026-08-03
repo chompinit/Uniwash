@@ -26,6 +26,28 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
+/**
+ * Uniwash brand palette (teal) — ใช้ร่วมกันทุกหน้าในแอป
+ * ดึงโทนจากม็อกอัปดีไซน์ฝั่งลูกค้า
+ */
+export const Brand = {
+  primary:       '#1C8A99', // teal หลัก (ปุ่ม, ไอคอน, ลิงก์)
+  primaryDark:   '#15707D', // teal เข้ม (กดปุ่ม, header เข้ม)
+  primaryLight:  '#E3F1F3', // teal อ่อน (พื้นการ์ดที่เลือก)
+  dark:          '#16161F', // header ดำเข้ม (หน้า Location/Status)
+  bg:            '#F3F5F7', // พื้นหลังหน้าจอ
+  card:          '#FFFFFF',
+  text:          '#1B1C2A',
+  textSecondary: '#8A8F98',
+  border:        '#E6E8EB',
+  inputBg:       '#EEF1F4',
+  danger:        '#E2574C',
+  success:       '#1C8A99',
+  warning:       '#F5A623',
+  gold:          '#F4B400', // เหรียญ coins
+  white:         '#FFFFFF',
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   Modal,
   SafeAreaView,
@@ -15,6 +16,7 @@ import {
   View,
 } from 'react-native'
 import { supabase } from '../../../lib/supabase'
+import { pickPhoto, uploadOrderPhoto } from '../../../lib/uploadPhoto'
 
 const ITEM_LABELS: Record<string, string> = {
   shirt: 'เสื้อผ้า',
@@ -37,7 +39,6 @@ const PRODUCT_PRICES: Record<string, number> = {
   p1: 10, p2: 10, p3: 15,
 }
 
-
 export default function SummaryScreen() {
   const { packageId, quantities, productId, totalPrice } = useLocalSearchParams()
 
@@ -46,12 +47,13 @@ export default function SummaryScreen() {
     : {}
 
   const [address, setAddress]           = useState('')
-  const [noteText, setNoteText]         = useState('')         
+  const [noteText, setNoteText]         = useState('')
   const [lat, setLat]                   = useState<number | null>(null)
   const [lng, setLng]                   = useState<number | null>(null)
   const [locLoading, setLocLoading]     = useState(false)
   const [editModalVisible, setEditModalVisible] = useState(false)
-  const [draftAddress, setDraftAddress] = useState('')         
+  const [draftAddress, setDraftAddress] = useState('')
+  const [photoUri, setPhotoUri]         = useState<string | null>(null)
 
   const [loading, setLoading] = useState(false)
 
@@ -136,6 +138,7 @@ export default function SummaryScreen() {
     }
     setLocLoading(false)
   }
+
   const saveAddressToProfile = async (addr: string) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -161,6 +164,15 @@ export default function SummaryScreen() {
     setLng(null)
     setEditModalVisible(false)
     await saveAddressToProfile(trimmed)
+  }
+
+  const handlePickPhoto = async () => {
+    try {
+      const uri = await pickPhoto(false)
+      if (uri) setPhotoUri(uri)
+    } catch (err: any) {
+      Alert.alert('เกิดข้อผิดพลาด', err?.message ?? String(err))
+    }
   }
 
   const handleConfirm = async () => {
@@ -213,6 +225,28 @@ export default function SummaryScreen() {
 
     await supabase.from('order_items').insert(items)
 
+    // หักเหรียญแบบ atomic ฝั่ง DB — ถ้าเหรียญไม่พอจะ error และยกเลิกออเดอร์
+    const { error: payErr } = await supabase.rpc('pay_order_with_coins', {
+      p_order_id: order.id,
+    })
+
+    if (payErr) {
+      await supabase.from('orders').update({ status: 'cancelled' }).eq('id', order.id)
+      setLoading(false)
+      Alert.alert('ชำระเงินไม่สำเร็จ', payErr.message, [
+        { text: 'ปิด', style: 'cancel' },
+        { text: '🪙 ไปเติมเหรียญ', onPress: () => router.push('/(customer)/coins' as any) },
+      ])
+      return
+    }
+
+    // อัปโหลดรูปตะกร้าผ้าของลูกค้า (ถ้ามี) — พลาดได้โดยไม่ล้มออเดอร์
+    if (photoUri) {
+      try {
+        await uploadOrderPhoto(order.id, 'customer', photoUri)
+      } catch {}
+    }
+
     await saveAddressToProfile(address.trim())
 
     setLoading(false)
@@ -228,95 +262,43 @@ export default function SummaryScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← กลับ</Text>
+        <TouchableOpacity style={styles.backChip} onPress={() => router.back()}>
+          <Text style={styles.backChipText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>สรุปการสั่ง</Text>
-        <View style={{ width: 40 }} />
+        <Text style={styles.headerTitle}>สรุปรายการ</Text>
+        <View style={{ width: 36 }} />
       </View>
 
       <ScrollView style={styles.content}>
 
-        {}
+        {/* รายละเอียดแพ็กเกจ — ตารางตามม็อกอัป */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>รายละเอียดแพ็กเกจ</Text>
+          <View style={styles.tableHead}>
+            <Text style={[styles.thText, { flex: 1 }]}>ชนิด</Text>
+            <Text style={[styles.thText, { width: 56, textAlign: 'center' }]}>จำนวน</Text>
+            <Text style={[styles.thText, { width: 64, textAlign: 'right' }]}>ราคา</Text>
+          </View>
           {Object.entries(parsedQty)
             .filter(([_, qty]) => qty > 0)
             .map(([type, qty]) => (
               <View key={type} style={styles.sumRow}>
                 <Text style={styles.sumLabel}>{ITEM_LABELS[type]}</Text>
-                <Text style={styles.sumQty}>{qty} ชิ้น</Text>
-                <Text style={styles.sumPrice}>{qty * ITEM_PRICES[type]} บาท</Text>
+                <Text style={styles.sumQty}>{qty}</Text>
+                <Text style={styles.sumPrice}>{qty * ITEM_PRICES[type]} THB</Text>
               </View>
             ))}
           <View style={styles.sumRow}>
             <Text style={styles.sumLabel}>{PRODUCT_NAMES[productId as string]}</Text>
             <Text style={styles.sumQty}>1</Text>
-            <Text style={styles.sumPrice}>{PRODUCT_PRICES[productId as string]} บาท</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>ยอดรวม</Text>
-            <Text style={styles.totalPrice}>{totalPrice} บาท</Text>
+            <Text style={styles.sumPrice}>{PRODUCT_PRICES[productId as string]} THB</Text>
           </View>
         </View>
 
-        {}
+        {/* เพิ่มรายละเอียด */}
         <View style={styles.card}>
-          <View style={styles.cardTitleRow}>
-            <Text style={styles.cardTitle}>📍 ที่อยู่จัดส่ง</Text>
-            {address ? (
-              <TouchableOpacity
-                onPress={() => {
-                  setDraftAddress(address)
-                  setEditModalVisible(true)
-                }}
-              >
-                <Text style={styles.editLink}>แก้ไข</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-
-          {}
-          {address ? (
-            <View style={styles.addressBox}>
-              <Text style={styles.addressText}>{address}</Text>
-              {lat && lng ? (
-                <Text style={styles.coordText}>
-                  📌 {lat.toFixed(5)}, {lng.toFixed(5)}
-                </Text>
-              ) : null}
-            </View>
-          ) : (
-            <Text style={styles.addressPlaceholder}>ยังไม่ได้กำหนดที่อยู่</Text>
-          )}
-
-          {}
-          <TouchableOpacity
-            style={styles.gpsBtn}
-            onPress={handleUseGPS}
-            disabled={locLoading}
-          >
-            {locLoading
-              ? <ActivityIndicator color="#1D9E75" size="small" />
-              : <Text style={styles.gpsBtnText}>📡 ใช้ตำแหน่งปัจจุบัน (GPS)</Text>
-            }
-          </TouchableOpacity>
-
-          {}
-          <TouchableOpacity
-            style={styles.typeBtn}
-            onPress={() => {
-              setDraftAddress(address)
-              setEditModalVisible(true)
-            }}
-          >
-            <Text style={styles.typeBtnText}>✏️ พิมพ์ที่อยู่เอง</Text>
-          </TouchableOpacity>
-
-          {}
-          <Text style={[styles.cardTitle, { marginTop: 14, marginBottom: 6 }]}>
-            หมายเหตุสำหรับคนส่ง (ไม่บังคับ)
-          </Text>
+          <Text style={styles.cardTitle}>เพิ่ม รายละเอียด</Text>
+          <Text style={styles.cardSub}>โปรดระบุรายละเอียดที่ต้องการเพิ่มเติม</Text>
           <TextInput
             style={styles.noteInput}
             placeholder="เช่น ห้อง 302 ชั้น 3 กดกริ่งหน้าประตู"
@@ -324,23 +306,72 @@ export default function SummaryScreen() {
             value={noteText}
             onChangeText={setNoteText}
             multiline
-            numberOfLines={2}
+            numberOfLines={3}
           />
         </View>
 
-        {}
+        {/* อัพโหลดรูปภาพ ตามม็อกอัป */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>💰 ชำระด้วย</Text>
-          <Text style={styles.payText}>เหรียญในระบบ</Text>
+          <Text style={styles.cardTitle}>อัพโหลดรูปภาพ</Text>
+          <Text style={styles.cardSub}>ถ่ายรูปตะกร้าผ้าของคุณเพื่อยืนยันจำนวน</Text>
+          <TouchableOpacity style={styles.uploadCircleWrap} onPress={handlePickPhoto}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.uploadPreview} />
+            ) : (
+              <View style={styles.uploadCircle}>
+                <Text style={{ fontSize: 22 }}>📷</Text>
+                <Text style={styles.uploadCircleText}>เพิ่ม</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {/* ที่อยู่ */}
+        <View style={styles.card}>
+          <View style={styles.addrHeader}>
+            <Text style={{ fontSize: 16 }}>📍</Text>
+            <Text style={styles.cardTitle}>ที่อยู่</Text>
+          </View>
+
+          {address ? (
+            <View style={styles.addrRow}>
+              <View style={styles.addrIcon}>
+                <Text style={{ fontSize: 18 }}>🏠</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.addrLabel}>บ้าน (ค่าเริ่มต้น)</Text>
+                <Text style={styles.addressText} numberOfLines={2}>{address}</Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={styles.addressPlaceholder}>ยังไม่ได้กำหนดที่อยู่</Text>
+          )}
+
+          <TouchableOpacity
+            style={styles.changeAddrBtn}
+            onPress={() => {
+              setDraftAddress(address)
+              setEditModalVisible(true)
+            }}
+          >
+            <Text style={styles.changeAddrText}>เปลี่ยนที่อยู่จัดส่ง</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gpsBtn} onPress={handleUseGPS} disabled={locLoading}>
+            {locLoading
+              ? <ActivityIndicator color="#1C8A99" size="small" />
+              : <Text style={styles.gpsBtnText}>📡 ใช้ตำแหน่งปัจจุบัน (GPS)</Text>
+            }
+          </TouchableOpacity>
         </View>
 
       </ScrollView>
 
-      {}
+      {/* Footer */}
       <View style={styles.footer}>
         <View style={styles.footerRow}>
-          <Text style={styles.footerLabel}>ยอดชำระ</Text>
-          <Text style={styles.footerPrice}>{totalPrice} บาท</Text>
+          <Text style={styles.footerLabel}>สรุปค่าใช้จ่าย{'\n'}ยอดรวมทั้งสิ้น</Text>
+          <Text style={styles.footerPrice}>{totalPrice} THB</Text>
         </View>
         <TouchableOpacity
           style={[styles.btnPrimary, (loading || !address) && styles.btnDisabled]}
@@ -349,12 +380,12 @@ export default function SummaryScreen() {
         >
           {loading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.btnText}>ยืนยันการสั่งซื้อ ✓</Text>
+            : <Text style={styles.btnText}>ยืนยัน</Text>
           }
         </TouchableOpacity>
       </View>
 
-      {}
+      {/* Modal แก้ที่อยู่ */}
       <Modal
         visible={editModalVisible}
         transparent
@@ -400,80 +431,90 @@ export default function SummaryScreen() {
     </SafeAreaView>
   )
 }
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#F3F5F7' },
   header: {
-    backgroundColor: '#fff', padding: 16,
+    backgroundColor: '#fff', padding: 14,
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderBottomWidth: 0.5, borderBottomColor: '#E0E0E0',
   },
-  backText: { fontSize: 15, color: '#1D9E75' },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: '#2C2C2A' },
+  backChip: {
+    width: 36, height: 36, borderRadius: 18, backgroundColor: '#EEF1F4',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  backChipText: { fontSize: 22, color: '#1B1C2A', fontWeight: '600', marginTop: -2 },
+  headerTitle: { fontSize: 16, fontWeight: '600', color: '#1B1C2A' },
   content: { flex: 1, padding: 16 },
 
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12 },
-  cardTitleRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12,
-  },
-  cardTitle: { fontSize: 13, fontWeight: '600', color: '#888780' },
-  editLink: { fontSize: 13, color: '#1D9E75', fontWeight: '600' },
+  cardTitle: { fontSize: 13, fontWeight: '700', color: '#1B1C2A' },
+  cardSub: { fontSize: 11.5, color: '#8A8F98', marginTop: 2, marginBottom: 10 },
 
+  tableHead: {
+    flexDirection: 'row', paddingVertical: 8, marginTop: 8,
+    borderBottomWidth: 1, borderBottomColor: '#E6E8EB',
+  },
+  thText: { fontSize: 11.5, color: '#8A8F98', fontWeight: '600' },
   sumRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 5, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0',
+    paddingVertical: 6, borderBottomWidth: 0.5, borderBottomColor: '#F0F0F0',
   },
-  sumLabel: { flex: 1, fontSize: 13, color: '#2C2C2A' },
-  sumQty: { fontSize: 13, color: '#888780', marginRight: 16 },
-  sumPrice: { fontSize: 13, fontWeight: '500', color: '#2C2C2A' },
-  totalRow: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 10 },
-  totalLabel: { fontSize: 15, fontWeight: '600', color: '#2C2C2A' },
-  totalPrice: { fontSize: 18, fontWeight: '700', color: '#1D9E75' },
+  sumLabel: { flex: 1, fontSize: 13, color: '#1B1C2A' },
+  sumQty: { width: 56, textAlign: 'center', fontSize: 13, color: '#8A8F98' },
+  sumPrice: { width: 64, textAlign: 'right', fontSize: 13, fontWeight: '500', color: '#1B1C2A' },
 
-  addressBox: {
-    backgroundColor: '#F0FBF6', borderRadius: 10, padding: 12, marginBottom: 10,
-    borderWidth: 1, borderColor: '#B2DFCF',
+  noteInput: {
+    borderWidth: 1, borderColor: '#E6E8EB', borderRadius: 10,
+    paddingHorizontal: 12, paddingVertical: 10,
+    fontSize: 13, color: '#1B1C2A', backgroundColor: '#FAFAFA',
+    textAlignVertical: 'top', minHeight: 70,
   },
-  addressText: { fontSize: 14, color: '#2C2C2A', lineHeight: 20 },
-  coordText: { fontSize: 11, color: '#1D9E75', marginTop: 4 },
+
+  uploadCircleWrap: { alignItems: 'center', paddingVertical: 6 },
+  uploadCircle: {
+    width: 84, height: 84, borderRadius: 42,
+    backgroundColor: '#EEF1F4', borderWidth: 1.5, borderColor: '#E6E8EB',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  uploadCircleText: { fontSize: 11, color: '#8A8F98', marginTop: 2 },
+  uploadPreview: { width: 120, height: 120, borderRadius: 14 },
+
+  addrHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  addrRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
+  addrIcon: {
+    width: 42, height: 42, borderRadius: 21, backgroundColor: '#E3F1F3',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  addrLabel: { fontSize: 13, fontWeight: '600', color: '#1B1C2A' },
+  addressText: { fontSize: 12, color: '#8A8F98', lineHeight: 17, marginTop: 2 },
   addressPlaceholder: {
-    fontSize: 13, color: '#B4B2A9', marginBottom: 10,
-    fontStyle: 'italic',
+    fontSize: 13, color: '#B4B2A9', marginBottom: 12, fontStyle: 'italic',
   },
+  changeAddrBtn: {
+    backgroundColor: '#F5A04C', borderRadius: 20,
+    paddingVertical: 9, alignItems: 'center', marginBottom: 8,
+  },
+  changeAddrText: { fontSize: 13, color: '#fff', fontWeight: '700' },
   gpsBtn: {
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#1D9E75', borderRadius: 10,
-    paddingVertical: 11, marginBottom: 8,
+    borderWidth: 1.5, borderColor: '#1C8A99', borderRadius: 10,
+    paddingVertical: 10,
   },
-  gpsBtnText: { fontSize: 14, color: '#1D9E75', fontWeight: '600' },
-  typeBtn: {
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center',
-    borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 10,
-    paddingVertical: 11,
-  },
-  typeBtnText: { fontSize: 14, color: '#888780', fontWeight: '500' },
-  noteInput: {
-    borderWidth: 1, borderColor: '#E0E0E0', borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-    fontSize: 13, color: '#2C2C2A', backgroundColor: '#FAFAFA',
-    textAlignVertical: 'top',
-  },
-  
-  payText: { fontSize: 14, color: '#2C2C2A' },
+  gpsBtnText: { fontSize: 13, color: '#1C8A99', fontWeight: '600' },
 
   footer: {
     padding: 16, backgroundColor: '#fff',
-    borderTopWidth: 0.5, borderTopColor: '#E0E0E0',
+    borderTopWidth: 0.5, borderTopColor: '#E6E8EB',
   },
   footerRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 12,
   },
-  footerLabel: { fontSize: 14, color: '#888780' },
-  footerPrice: { fontSize: 22, fontWeight: '700', color: '#1D9E75' },
-  btnPrimary: { backgroundColor: '#1D9E75', borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
+  footerLabel: { fontSize: 12, color: '#8A8F98', lineHeight: 18 },
+  footerPrice: { fontSize: 20, fontWeight: '800', color: '#1B1C2A' },
+  btnPrimary: { backgroundColor: '#1C8A99', borderRadius: 14, paddingVertical: 15, alignItems: 'center' },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 
   modalOverlay: {
     flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end',
@@ -483,22 +524,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24, borderTopRightRadius: 24,
     padding: 24,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#2C2C2A', marginBottom: 4 },
-  modalSub: { fontSize: 13, color: '#888780', marginBottom: 16 },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1B1C2A', marginBottom: 4 },
+  modalSub: { fontSize: 13, color: '#8A8F98', marginBottom: 16 },
   modalInput: {
-    borderWidth: 1.5, borderColor: '#E0E0E0', borderRadius: 12,
+    borderWidth: 1.5, borderColor: '#E6E8EB', borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: '#2C2C2A', backgroundColor: '#FAFAFA',
+    fontSize: 14, color: '#1B1C2A', backgroundColor: '#FAFAFA',
     textAlignVertical: 'top', minHeight: 90, marginBottom: 20,
   },
   modalBtnRow: { flexDirection: 'row', gap: 10 },
   modalBtnCancel: {
-    flex: 1, borderWidth: 1.5, borderColor: '#E0E0E0',
+    flex: 1, borderWidth: 1.5, borderColor: '#E6E8EB',
     borderRadius: 12, paddingVertical: 13, alignItems: 'center',
   },
-  modalBtnCancelText: { fontSize: 15, color: '#888780' },
+  modalBtnCancelText: { fontSize: 15, color: '#8A8F98' },
   modalBtnConfirm: {
-    flex: 1, backgroundColor: '#1D9E75',
+    flex: 1, backgroundColor: '#1C8A99',
     borderRadius: 12, paddingVertical: 13, alignItems: 'center',
   },
   modalBtnConfirmText: { fontSize: 15, color: '#fff', fontWeight: '600' },

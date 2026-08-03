@@ -1,26 +1,28 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useState } from 'react'
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native'
 
 const ITEMS = [
-  { type: 'shirt', label: 'เสื้อผ้า', price: 9, emoji: '👕' },
-  { type: 'pant', label: 'กางเกง', price: 9, emoji: '👖' },
-  { type: 'underwear', label: 'ชุดชั้นใน', price: 3, emoji: '🩱' },
-  { type: 'bedsheet', label: 'ผ้าปูที่นอน', price: 20, emoji: '🛏️' },
+  { type: 'shirt', label: 'เสื้อผ้า', desc: 'เช่น เสื้อยืด เสื้อเชิ้ต ครึ่งแขนหรือแขนยาว', price: 9, emoji: '👕' },
+  { type: 'pant', label: 'กางเกง', desc: 'เช่น กางเกงขาสั้น ขายาว ครึ่งตัวหรือเต็มตัว', price: 9, emoji: '👖' },
+  { type: 'underwear', label: 'ชุดชั้นใน', desc: 'เช่น ชุดชั้นในทุกชนิด', price: 3, emoji: '🩱' },
+  { type: 'bedsheet', label: 'ผ้าปูที่นอน', desc: 'เช่น ผ้าปูที่นอน ปลอกหมอน ผ้าห่ม', price: 20, emoji: '🛏️' },
 ]
 
 const PRODUCTS = [
-  { id: 'p1', name: 'น้ำยาซักของร้าน', price: 10, emoji: '🧴' },
-  { id: 'p2', name: 'Bleach', price: 10, emoji: '🫧' },
-  { id: 'p3', name: 'Comfort', price: 15, emoji: '💧' },
+  { id: 'p1', name: 'น้ำยาซักของร้าน', price: 10, emoji: '🧴', group: 'น้ำยาซักผ้า' },
+  { id: 'p2', name: 'Bleach', price: 10, emoji: '🫧', group: 'น้ำยาซักผ้า' },
+  { id: 'p3', name: 'Comfort', price: 15, emoji: '💧', group: 'น้ำยาปรับผ้านุ่ม' },
 ]
+
+const GROUPS = ['น้ำยาซักผ้า', 'น้ำยาปรับผ้านุ่ม']
 
 export default function SelectScreen() {
   const { packageId } = useLocalSearchParams()
@@ -45,73 +47,88 @@ export default function SelectScreen() {
   return (
     <SafeAreaView style={styles.container}>
 
+      {/* Header teal ตามม็อกอัป */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={styles.backText}>← กลับ</Text>
+          <Text style={styles.backText}>‹</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>เลือกผ้า</Text>
-        <View style={{ width: 40 }} />
+        <View style={{ marginLeft: 12 }}>
+          <Text style={styles.deliverTo}>DELIVER TO</Text>
+          <Text style={styles.deliverName}>Uniwash office ▾</Text>
+        </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* เลือกจำนวนผ้า */}
-        <Text style={styles.sectionTitle}>เลือกชนิดและจำนวนผ้า</Text>
-        {ITEMS.map(item => (
-          <View key={item.type} style={styles.itemRow}>
-            <Text style={styles.itemEmoji}>{item.emoji}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.itemName}>{item.label}</Text>
-              <Text style={styles.itemPrice}>{item.price} บาท/ชิ้น</Text>
+        <Text style={styles.heading}>เลือกชนิดและจำนวนผ้าที่ต้องการ</Text>
+
+        {/* ชนิดผ้า — การ์ดคู่ตามม็อกอัป */}
+        <Text style={styles.sectionTitle}>ชนิดผ้า</Text>
+        <View style={styles.grid}>
+          {ITEMS.map(item => (
+            <View key={item.type} style={styles.typeCard}>
+              <View style={styles.typeImage}>
+                <Text style={{ fontSize: 44 }}>{item.emoji}</Text>
+              </View>
+              <Text style={styles.typeName}>{item.label}</Text>
+              <Text style={styles.typeDesc} numberOfLines={2}>{item.desc}</Text>
+              <View style={styles.typeRow}>
+                <Text style={styles.typeRowLabel}>ราคา</Text>
+                <Text style={styles.typeRowValue}>{item.price} THB</Text>
+              </View>
+              <View style={styles.typeRow}>
+                <Text style={styles.typeRowLabel}>จำนวน</Text>
+                <View style={styles.qtyControl}>
+                  <TouchableOpacity onPress={() => changeQty(item.type, -1)} hitSlop={8}>
+                    <Text style={styles.qtyBtnText}>−</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.qtyNum}>{quantities[item.type] || 0}</Text>
+                  <TouchableOpacity onPress={() => changeQty(item.type, 1)} hitSlop={8}>
+                    <Text style={styles.qtyBtnText}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-            <View style={styles.qtyControl}>
-              <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => changeQty(item.type, -1)}
-              >
-                <Text style={styles.qtyBtnText}>−</Text>
-              </TouchableOpacity>
-              <Text style={styles.qtyNum}>{quantities[item.type] || 0}</Text>
-              <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => changeQty(item.type, 1)}
-              >
-                <Text style={styles.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
+          ))}
+        </View>
+
+        {/* ผลิตภัณฑ์ — แถวเลื่อนข้างตามม็อกอัป */}
+        <Text style={styles.heading}>เลือกผลิตภัณฑ์ที่ต้องการ</Text>
+        {GROUPS.map(group => (
+          <View key={group}>
+            <Text style={styles.sectionTitle}>{group}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+              {PRODUCTS.filter(p => p.group === group).map(prod => (
+                <TouchableOpacity
+                  key={prod.id}
+                  style={[styles.prodCard, selectedProduct === prod.id && styles.prodCardSelected]}
+                  onPress={() => setSelectedProduct(prod.id)}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.prodImage}>
+                    <Text style={{ fontSize: 34 }}>{prod.emoji}</Text>
+                  </View>
+                  <Text style={styles.prodName} numberOfLines={1}>{prod.name}</Text>
+                  <View style={styles.typeRow}>
+                    <Text style={styles.typeRowLabel}>ราคา</Text>
+                    <Text style={styles.typeRowValue}>{prod.price} THB</Text>
+                  </View>
+                  {selectedProduct === prod.id && (
+                    <View style={styles.prodCheck}>
+                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '700' }}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         ))}
 
-        {/* เลือกน้ำยา */}
-        <Text style={styles.sectionTitle}>เลือกน้ำยาซักผ้า</Text>
-        {PRODUCTS.map(prod => (
-          <TouchableOpacity
-            key={prod.id}
-            style={[
-              styles.productRow,
-              selectedProduct === prod.id && styles.productRowSelected,
-            ]}
-            onPress={() => setSelectedProduct(prod.id)}
-          >
-            <Text style={{ fontSize: 24 }}>{prod.emoji}</Text>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.productName}>{prod.name}</Text>
-              <Text style={styles.productPrice}>{prod.price} บาท</Text>
-            </View>
-            {selectedProduct === prod.id && (
-              <Text style={{ color: '#1D9E75', fontWeight: '700' }}>✓</Text>
-            )}
-          </TouchableOpacity>
-        ))}
-
+        <View style={{ height: 16 }} />
       </ScrollView>
 
       {/* Footer */}
       <View style={styles.footer}>
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>รวม {totalItems} ชิ้น</Text>
-          <Text style={styles.totalPrice}>{totalPrice} บาท</Text>
-        </View>
         <TouchableOpacity
           style={[styles.btnPrimary, totalItems === 0 && styles.btnDisabled]}
           disabled={totalItems === 0}
@@ -127,7 +144,7 @@ export default function SelectScreen() {
             })
           }
         >
-          <Text style={styles.btnText}>สรุปการสั่งซื้อ →</Text>
+          <Text style={styles.btnText}>สรุปรายการ</Text>
         </TouchableOpacity>
       </View>
 
@@ -136,57 +153,64 @@ export default function SelectScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: {
-    backgroundColor: '#fff', padding: 16,
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderBottomWidth: 0.5, borderBottomColor: '#E0E0E0',
-  },
-  backText: { fontSize: 15, color: '#1D9E75' },
-  headerTitle: { fontSize: 17, fontWeight: '600', color: '#2C2C2A' },
-  content: { flex: 1, padding: 16 },
-  sectionTitle: {
-    fontSize: 13, fontWeight: '600',
-    color: '#888780', marginBottom: 10, marginTop: 8,
-  },
-  itemRow: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
+    backgroundColor: '#1C8A99', paddingHorizontal: 16, paddingVertical: 12,
     flexDirection: 'row', alignItems: 'center',
-    marginBottom: 8, gap: 12,
   },
-  itemEmoji: { fontSize: 28 },
-  itemName: { fontSize: 14, fontWeight: '500', color: '#2C2C2A' },
-  itemPrice: { fontSize: 12, color: '#1D9E75', marginTop: 2 },
+  backText: { fontSize: 26, color: '#fff', fontWeight: '600' },
+  deliverTo: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.5 },
+  deliverName: { fontSize: 13, fontWeight: '600', color: '#fff', marginTop: 1 },
+
+  content: { flex: 1, paddingHorizontal: 16 },
+  heading: { fontSize: 16, fontWeight: '700', color: '#1B1C2A', marginTop: 16, marginBottom: 8 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#8A8F98', marginBottom: 10 },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  typeCard: {
+    width: '47.5%', backgroundColor: '#fff', borderRadius: 14,
+    borderWidth: 1, borderColor: '#E6E8EB', padding: 12,
+  },
+  typeImage: {
+    height: 90, borderRadius: 10, backgroundColor: '#EEF1F4',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+  },
+  typeName: { fontSize: 14, fontWeight: '700', color: '#1B1C2A', marginBottom: 3 },
+  typeDesc: { fontSize: 10.5, color: '#8A8F98', lineHeight: 14, marginBottom: 8, minHeight: 28 },
+  typeRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 4,
+  },
+  typeRowLabel: { fontSize: 12, color: '#8A8F98' },
+  typeRowValue: { fontSize: 12.5, fontWeight: '700', color: '#1B1C2A' },
   qtyControl: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  qtyBtn: {
-    width: 30, height: 30, borderRadius: 8,
-    backgroundColor: '#E1F5EE',
+  qtyBtnText: { fontSize: 17, color: '#1C8A99', fontWeight: '700' },
+  qtyNum: { fontSize: 14, fontWeight: '700', color: '#1B1C2A', minWidth: 18, textAlign: 'center' },
+
+  prodCard: {
+    width: 120, backgroundColor: '#fff', borderRadius: 14,
+    borderWidth: 1, borderColor: '#E6E8EB', padding: 10, marginRight: 10,
+  },
+  prodCardSelected: { borderColor: '#1C8A99', backgroundColor: '#E3F1F3' },
+  prodImage: {
+    height: 70, borderRadius: 10, backgroundColor: '#EEF1F4',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 6,
+  },
+  prodName: { fontSize: 12, fontWeight: '700', color: '#1B1C2A', marginBottom: 4 },
+  prodCheck: {
+    position: 'absolute', top: 8, right: 8,
+    width: 20, height: 20, borderRadius: 10, backgroundColor: '#1C8A99',
     alignItems: 'center', justifyContent: 'center',
   },
-  qtyBtnText: { fontSize: 18, color: '#1D9E75', fontWeight: '700' },
-  qtyNum: { fontSize: 16, fontWeight: '600', color: '#2C2C2A', minWidth: 24, textAlign: 'center' },
-  productRow: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
-    flexDirection: 'row', alignItems: 'center',
-    marginBottom: 8, borderWidth: 1.5, borderColor: 'transparent',
-  },
-  productRowSelected: { borderColor: '#1D9E75', backgroundColor: '#E1F5EE' },
-  productName: { fontSize: 14, fontWeight: '500', color: '#2C2C2A' },
-  productPrice: { fontSize: 12, color: '#1D9E75', marginTop: 2 },
+
   footer: {
     padding: 16, backgroundColor: '#fff',
-    borderTopWidth: 0.5, borderTopColor: '#E0E0E0',
+    borderTopWidth: 0.5, borderTopColor: '#E6E8EB',
   },
-  totalRow: {
-    flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: 12,
-  },
-  totalLabel: { fontSize: 14, color: '#888780' },
-  totalPrice: { fontSize: 20, fontWeight: '700', color: '#1D9E75' },
   btnPrimary: {
-    backgroundColor: '#1D9E75', borderRadius: 12,
-    paddingVertical: 15, alignItems: 'center',
+    backgroundColor: '#15707D', borderRadius: 16,
+    paddingVertical: 16, alignItems: 'center',
   },
-  btnDisabled: { opacity: 0.4 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  btnDisabled: { opacity: 0.5 },
+  btnText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 })
